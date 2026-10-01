@@ -280,12 +280,11 @@ async function queryOnce(filters: CardFilters, post: PostFilters = {}): Promise<
   if (!Array.isArray(data)) {
     throw new Error(`Unexpected Metabase response: ${JSON.stringify(data).slice(0, 500)}`);
   }
-  if (filters.set_number && data.length && !data.some((o: Record<string, unknown>) => Object.keys(o).some((k) => /^(set_number|card_number)$/i.test(k)))) {
-    throw new Error("Question 4131 doesn't include card numbers yet. Add cards.set_number (SET_NUMBER) to 4131 and save it, then search again.");
-  }
+  // 4131 without a SET_NUMBER column: don't fail — match on everything else (the screen says the card # wasn't checked)
+  const noNumberColumn = !!filters.set_number && data.length > 0 && !data.some((o: Record<string, unknown>) => Object.keys(o).some((k) => /^(set_number|card_number)$/i.test(k)));
   let rows = applyLocal(data.map(toRow).filter((r) => r.item_id), local);
   // card numbers are exact: "US189" never matches "US1890"; "#" and spaces ignored
-  if (typeof filters.set_number === "string") {
+  if (typeof filters.set_number === "string" && !noNumberColumn) {
     const want = normNo(filters.set_number);
     // "US189" must match exactly; digits alone ("189") match any prefix (US189, 189)
     rows = rows.filter((r) => {

@@ -35,6 +35,8 @@ Notes:
 | `to $300`, `ev 300`, `ev = 1.2k`, `→ $85.50`, `set to 300` | **New value** (pulled out before searching) |
 | `over $200`, `under $1k`, `between $200 and $1,000` | Filters on the **current** value |
 | a pasted card row (tabs or wide gaps between columns): `2026 Pokemon Mega Evolution — Mega Lucario ex 033 — Ascended Heroes Premium Poster Collection - Mega Lucario — PSA 10` | **Exact** search: set · insert · player · card # (its own column, or on the end of the player) · parallel (`—`/blank = base) · grade, e.g. `2022-23 Panini Donruss  Rated Rookie  Chet Holmgren  202  —  PSA 9`. Insert must match too (`—` = no insert). Paste several rows (one per line) to fetch several cards at once |
+| `tag sd_wemby_grail`, `tagged inv_dump`, `#op_promo`, a bare snake_case tag, `untagged` | **Tag filter** — on its own pulls every card with that tag; with other words narrows that search. Several tags = any of them |
+| a Pokémon / One Piece title: `2023 pokemon swsh crown zenith leafeon vstar #gg35 psa 10`, `2025 one piece tony tony chopper p-101 store tournament vol.4 arena club 10` | **Title search**: finds the character first, then keeps cards where every other word is on the card (set, insert, parallel, #); year, grade and card # must match. Words that are on none of that character's cards (e.g. "swsh") are ignored and shown. Also the fallback when a normal search finds nothing |
 | everything else | Same search as the Tag Bot (players, sets, parallels, card #, grades, AC/cert numbers) |
 
 **The flow (two steps, like admin) — same layout as the Tag Bot:**

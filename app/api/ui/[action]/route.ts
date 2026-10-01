@@ -8,6 +8,9 @@ import { listPrompts, addPrompt, renamePrompt, deletePrompt } from "@/lib/ui";
 import { smartSearch } from "@/lib/search";
 import { readTarget } from "@/lib/target";
 import { parsePasted, searchPasted } from "@/lib/paste";
+import { readTags, hasTag } from "@/lib/tagfilter";
+import { titleSearch, looksLikeTcg } from "@/lib/title";
+import { queryCards } from "@/lib/metabase";
 import { probeEv } from "@/lib/admin";
 import {
   can, actorOf, currentUser, sessionCookie, clearCookie, signIn, needsSetup, setupFirstAdmin, inviteInfo, acceptInvite,
@@ -141,10 +144,28 @@ export async function POST(req: Request, ctx: Ctx) {
         }
         // pasted card rows (set · insert · player + # · parallel · grade) search exactly; anything else is a typed request
         const pasted = parsePasted(rest);
-        const r = pasted
+        const tg = pasted ? { tags: [], untagged: false, rest } : readTags(rest);
+        // tag only ("tag sd_wemby_grail"): pull the cards with that tag straight from 4131
+        const tagOnly = !pasted && (tg.tags.length > 0) && !tg.rest;
+        const r0 = tagOnly
+          ? await (async () => { const t0 = Date.now(); const rows = (await Promise.all(tg.tags.map((t) => queryCards({ tag: t })))).flat();
+              return { parsed: { filters: {}, post_filters: {} }, has_filter: true, queries: tg.tags.map((t) => ({ tag: t })), ms: Date.now() - t0, rows: [...new Map(rows.map((x) => [x.item_id, x])).values()], missing: [] as string[] }; })()
+          : pasted
           ? await (async () => { const t0 = Date.now(); const p = await searchPasted(pasted);
               return { parsed: { filters: p.display, post_filters: {} }, has_filter: true, queries: p.queries, ms: Date.now() - t0, rows: p.rows, missing: p.missing }; })()
-          : await smartSearch(rest);
+          : await (async () => {
+              // Pokémon / One Piece titles: title search first; anything else: the Tag Bot search, with title search as the fallback
+              const asTitle = async () => { const x = await titleSearch(tg.rest); return x && x.rows.length ? { parsed: { filters: x.display, post_filters: {} }, has_filter: true, queries: x.queries, ms: x.ms, rows: x.rows, missing: x.missing } : null; };
+              if (looksLikeTcg(tg.rest)) { const x = await asTitle(); if (x) return x; }
+              const r1 = await smartSearch(tg.rest).catch(() => null);
+              if (r1 && r1.rows.length) return r1;
+              return (await asTitle()) ?? r1 ?? (await smartSearch(tg.rest));
+            })();
+        // tag filter on top of whatever else was typed
+        const tagRows = r0.rows.filter((x) => hasTag(x.tag, tg.tags) && (!tg.untagged || !x.tag));
+        const r = { ...r0, rows: tagRows, queries: r0.queries,
+          parsed: { ...r0.parsed, filters: { ...(r0.parsed?.filters ?? {}), ...(tg.tags.length ? { tag: tg.tags.join(" or ") } : {}), ...(tg.untagged ? { tag: "none (untagged)" } : {}) } },
+          has_filter: r0.has_filter || tg.tags.length > 0 || tg.untagged };
         const LIMIT = 3000;
         return json({
           target_ev: target,

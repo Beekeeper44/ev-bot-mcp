@@ -15,7 +15,7 @@
   box-sizing:border-box;
   padding-top:env(safe-area-inset-top,0px);
 }
-@media (prefers-color-scheme: dark){ 
+@media (prefers-color-scheme: dark){
   :root:not([data-theme="light"]){
     --bg:#050b07; --panel:#0a140d; --panel2:#0f1d13; --line:#1d3523; --text:#d5f3da; --dim:#6d8d74;
     --go:#39FF14; --go-ink:#031005; --warn:#ffb000; --warn-bg:#231800; --off:#24382a;
@@ -184,6 +184,9 @@ dialog.info{max-width:760px;width:calc(100% - 32px);padding:0}
 .copyb{display:inline-flex;align-items:center;justify-content:center;min-width:22px;height:20px;margin-left:5px;padding:0 4px;border:1px solid var(--line);border-radius:5px;font-size:12px;line-height:1;cursor:copy;color:var(--dim);vertical-align:middle;user-select:none}
 .copyb:hover,.copyb:focus-visible{border-color:var(--go);color:var(--go);outline:none}
 .copyb.done{border-color:var(--go);color:var(--go);font-weight:800}
+.copyv{font-weight:700;color:var(--text);cursor:copy;border-bottom:1px dashed var(--line);user-select:text}
+.copyv:hover{color:var(--go);border-bottom-color:var(--go)}
+.copyv.flash{color:var(--go);border-bottom-color:var(--go)}
 .tile .facts b,.tile .row .dim{user-select:text}
 .evfield input{width:min(140px,40vw)}
 .evform{display:grid;grid-template-columns:1.6fr .7fr 1.2fr;gap:8px;margin-top:10px}
@@ -264,7 +267,7 @@ dialog .acts{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}
       <div id="srcMsg" class="small" aria-live="polite"></div>
     </div>
     <form class="ask" id="form" autocomplete="off">
-      <textarea rows="1" id="input" aria-label="Which cards, and what value? You can paste card rows." placeholder="Type or use voice: ohtani #US189 base psa 10 ev 300 lc 300 note mcp done"></textarea>
+      <textarea rows="1" id="input" aria-label="Which cards, and what value? You can paste card rows or filter by tag." placeholder="Type or use voice: ohtani #US189 base psa 10 ev 300 lc 300 note mcp done"></textarea>
       <button class="btn mic" type="button" id="micBtn" aria-pressed="false" title="Use your voice instead of typing">🎤<span class="mictxt"> Voice</span></button>
       <button class="btn" type="button" id="saveBtn">Save prompt</button>
       <button class="btn primary" type="submit">Find cards</button>
@@ -558,7 +561,7 @@ function render(){
   const kinds=[...new Set(sel.map(cardKey))];
   const vals=S.matched.map(r=>r.ev||0).filter(v=>v>0).sort((a,b)=>a-b);
   const med=vals.length?vals[Math.floor(vals.length/2)]:null;
-  const lab={insert:"insert",pasted:"pasted",note:"note",set_number:"card #",contains:"also matches",ac_number:"AC #",cert_number:"cert",player_name:"player",set_name:"set",parallel_name:"parallel",grading_company:"grader",grade:"grade",min_estimated_value:"current min",max_estimated_value:"current max",sport:"sport",tag:"current tag"};
+  const lab={insert:"insert",pasted:"pasted",note:"note",set_number:"card #",contains:"also matches",ac_number:"AC #",cert_number:"cert",player_name:"player",set_name:"set",parallel_name:"parallel",grading_company:"grader",grade:"grade",min_estimated_value:"current min",max_estimated_value:"current max",sport:"sport",tag:"tag"};
   const chips=Object.entries(S.filters).map(([k,v])=>`<span class="chip"><i>${Array.isArray(v)?`${lab[k]||k}s (${v.length})`:(lab[k]||k)}</i> ${esc(k.includes("value")?money(v):v==="__base__"?"base (no parallel)":Array.isArray(v)?v.join(" or "):String(v).replace("%"," "))}</span>`).join("")+(S.post&&S.post.only_base?`<span class="chip"><i>parallel</i> base only</span>`:"");
   const locked=S.phase!=="review";
   $("#summary").innerHTML=`<div class="summary">
@@ -613,12 +616,17 @@ function resultHeader(){
 }
 /* copy buttons (cert, AC): copy without selecting/deselecting the tile */
 const copyBtn=(v,what)=>v?`<span class="copyb" role="button" tabindex="0" data-copy="${esc(v)}" title="Copy ${esc(what)}" aria-label="Copy ${esc(what)} ${esc(v)}">⧉</span>`:"";
+const copyVal=(v,what)=>v?`<span class="copyv" data-copy="${esc(v)}" title="Click to copy ${esc(what)}">${esc(v)}</span>`:"";
 async function copyText(el){
   const v=el.dataset.copy; let ok=false;
+  if(el.classList.contains("copyv")){ const icon=el.nextElementSibling&&el.nextElementSibling.classList.contains("copyb")?el.nextElementSibling:null;
+    el.classList.add("flash"); setTimeout(()=>el.classList.remove("flash"),900); if(icon) el=icon; }
   try{ await navigator.clipboard.writeText(v); ok=true; }catch{ const t=document.createElement("textarea"); t.value=v; document.body.appendChild(t); t.select(); try{ok=document.execCommand("copy")}catch{} t.remove(); }
   el.textContent=ok?"✓":"!"; el.classList.add("done"); setTimeout(()=>{el.textContent="⧉"; el.classList.remove("done")},1200);
 }
-document.addEventListener("click",e=>{const c=e.target.closest(".copyb"); if(!c) return; e.preventDefault(); e.stopPropagation(); copyText(c);},true);
+const copyTarget=e=>(e.target.closest&&e.target.closest("[data-copy]"))||((document.elementFromPoint(e.clientX,e.clientY)||{}).closest?.("[data-copy]"))||null;
+document.addEventListener("click",e=>{const c=copyTarget(e); if(!c) return; e.preventDefault(); e.stopPropagation(); copyText(c);},true);
+document.addEventListener("mousedown",e=>{ if(copyTarget(e)) e.preventDefault(); },true); /* keep the tile from taking focus */
 document.addEventListener("keydown",e=>{const c=e.target.closest&&e.target.closest(".copyb"); if(!c||(e.key!=="Enter"&&e.key!==" ")) return; e.preventDefault(); e.stopPropagation(); copyText(c);},true);
 function tile(r){
   const on=S.selected.has(r.item_id);
@@ -639,14 +647,14 @@ function tile(r){
     else{ const p=pct(r.ev,v), b=isBig(r,v);
       change=`<span class="pill old">${money2(r.ev||0)}</span><span class="dim">→</span><span class="pill new">${money2(v)}</span>${p!=null?`<span class="${b?"pill big":p>=0?"up":"down"}">${p>=0?"+":""}${p}%</span>`:`<span class="pill big">no value</span>`}`; }
   }
-  const facts=[r.last_comp!==undefined?`Last comp <b>${r.last_comp!=null?money2(r.last_comp):"none"}</b>`:"", r.requested_at?`Requested <b>${when(r.requested_at)}</b>`:"", r.cert?`Cert <b>${esc(r.cert)}</b>${copyBtn(r.cert,"cert")}`:"", (r.bin||r.slot)?`Bin <b>${esc(r.bin??"—")}</b> · Slot <b>${esc(r.slot??"—")}</b>`:"", r.status?`Status <b>${esc(r.status)}</b>`:"", r.ev_age_days!=null?`EV <b>${r.ev_age_days}d</b> old`:""].filter(Boolean).join("<br>");
+  const facts=[r.last_comp!==undefined?`Last comp <b>${r.last_comp!=null?money2(r.last_comp):"none"}</b>`:"", r.requested_at?`Requested <b>${when(r.requested_at)}</b>`:"", r.cert?`Cert ${copyVal(r.cert,"cert")}${copyBtn(r.cert,"cert")}`:"", r.tag?`Tag <b>${esc(r.tag)}</b>`:"", (r.bin||r.slot)?`Bin <b>${esc(r.bin??"—")}</b> · Slot <b>${esc(r.slot??"—")}</b>`:"", r.status?`Status <b>${esc(r.status)}</b>`:"", r.ev_age_days!=null?`EV <b>${r.ev_age_days}d</b> old`:""].filter(Boolean).join("<br>");
   return `<div class="tw"><button type="button" class="infob" data-info="${esc(r.item_id)}" aria-label="Details for ${esc(r.player_name)}" title="Details">i</button><button type="button" class="tile" data-id="${r.item_id}" aria-pressed="${on}" ${S.phase!=="review"?"disabled":""} aria-label="${esc(r.player_name)} ${esc(r.set_name)}">
     <span class="check" aria-hidden="true">${on?"✓":""}</span>
     <div class="slab"><div class="lbl"><span>${esc((r.grade||"").toUpperCase())}</span><span>${r.parallel_total?"/"+esc(r.parallel_total):""}</span></div>
       <div class="art" style="background:linear-gradient(150deg,hsl(${h} 55% 38%),hsl(${(h+40)%360} 60% 22%))">${esc(initials)}${r.img?`<img src="${esc(r.img)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">`:""}</div></div>
     <div class="name">${esc(r.player_name)}</div>
     <div class="meta">${esc(r.set_name)}${r.insert?" · "+esc(r.insert):""}${r.parallel_name?"<br>"+esc(r.parallel_name):""}</div>
-    <div class="row"><span class="dim">AC ${esc(r.ac)}${copyBtn(r.ac,"AC number")}</span><span class="ev">${money2(r.ev)}</span></div>
+    <div class="row"><span class="dim">AC ${copyVal(r.ac,"AC number")}${copyBtn(r.ac,"AC number")}</span><span class="ev">${money2(r.ev)}</span></div>
     ${facts?`<div class="facts">${facts}</div>`:""}
     ${S.scope==="tasks"&&S.phase==="review"&&copiesOf(r.item_id).length?`<div class="small" style="color:var(--go);font-weight:700">+${copiesOf(r.item_id).length} ${copiesOf(r.item_id).length===1?"copy":"copies"} in the warehouse (now ${[...new Set(copiesOf(r.item_id).map(c=>money2(c.ev)))].slice(0,3).join(", ")})</div>`:""}
     ${r.pending&&S.phase==="review"?`<div class="pend">Already in Approve at ${money2(r.pending.ev)} (by ${esc(r.pending.by)})</div>`:""}
@@ -684,7 +692,7 @@ function showInfo(id){
         ${row("Current tag",r.tag?`<span class="pill">${esc(r.tag)}</span>`:"no tag")}
         ${row("Status",esc(r.status))}
         ${row("Sport",esc(r.sport))}
-        ${row("Card number",esc(r.set_number))}${row("Cert",r.cert?esc(r.cert)+copyBtn(r.cert,"cert"):"")}${row("AC number",r.ac?esc(r.ac)+copyBtn(r.ac,"AC number"):"")}
+        ${row("Card number",esc(r.set_number))}${row("Cert",r.cert?copyVal(r.cert,"cert")+copyBtn(r.cert,"cert"):"")}${row("AC number",r.ac?copyVal(r.ac,"AC number")+copyBtn(r.ac,"AC number"):"")}
         ${row("Storage",(r.bin||r.slot)?`Bin ${esc(r.bin??"—")} · Slot ${esc(r.slot??"—")}`:"")}
         ${row("Order",esc(r.order_number))}${row("PO",esc(r.po_number))}
         ${row("Purchase cost",r.purchase_cost!=null?money(r.purchase_cost):"")}${row("Bought at",esc(r.purchase_location))}
