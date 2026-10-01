@@ -1,0 +1,255 @@
+// JSON API for the EV Bot screen. Everything except sign-in/setup/invites needs a signed-in account.
+import { config } from "@/lib/config";
+import { type CardFilters, type PostFilters } from "@/lib/metabase";
+import { runSelection, undoRun, listRuns, getRunItems, submitTasks, approvalQueue, approveQueued, withdrawQueued, type SubmitItem } from "@/lib/runs";
+import { listTasks, filterTasks } from "@/lib/tasks";
+import { findCopies } from "@/lib/copies";
+import { listPrompts, addPrompt, renamePrompt, deletePrompt } from "@/lib/ui";
+import { smartSearch } from "@/lib/search";
+import { readTarget } from "@/lib/target";
+import { parsePasted, searchPasted } from "@/lib/paste";
+import { probeEv } from "@/lib/admin";
+import {
+  can, actorOf, currentUser, sessionCookie, clearCookie, signIn, needsSetup, setupFirstAdmin, inviteInfo, acceptInvite,
+  changePassword, listUsers, addUser, updateUser, relinkAdmin, resetInvite, newMcpKey, revokeMcpKey, type User, type Role,
+} from "@/lib/users";
+
+export const maxDuration = 300;
+
+const json = (data: unknown, status = 200, headers: Record<string, string> = {}) =>
+  new Response(JSON.stringify(data), { status, headers: { "Content-Type": "application/json", "Cache-Control": "no-store", ...headers } });
+const fail = (e: unknown, status = 400) => json({ error: e instanceof Error ? e.message : String(e) }, status);
+const origin = (req: Request) => new URL(req.url).origin;
+const forbid = (u: User, role: Role) => (can(u, role) ? null : json({ error: `This needs ${role} access. You're a ${u.role}.` }, 403));
+
+type Ctx = { params: Promise<{ action: string }> };
+
+function me(u: User, req: Request) {
+  const shared = !u.admin_user_id;
+  return {
+    user: u.name, email: u.email, role: u.role, id: u.id,
+    can_write: can(u, "editor") && (!shared || config.sharedSessionFallback()),
+    can_approve: can(u, "approver"),
+    tasks_configured: config.evTasksCardId() > 0,
+    is_admin: can(u, "admin"),
+    admin_link: shared ? (config.sharedSessionFallback() ? "shared" : "missing") : "own",
+    has_mcp_key: u.has_mcp_key,
+    mcp_base: `${origin(req)}/api/mcp?key=`,
+    dry_run: config.dryRun(), max_items_per_run: config.maxItemsPerRun(), full_access: config.fullAccess(), big_change_pct: config.bigChangePct(),
+    min_ev: config.minEv(), max_ev: config.maxEv(), default_note: config.defaultNote(), approve: true, approve_note: config.evApproveNote(),
+  };
+}
+
+export async function GET(req: Request, ctx: Ctx) {
+  const { action } = await ctx.params;
+  try {
+    if (action === "config") return json({ needs_setup: await needsSetup() });
+    const u = await currentUser(req);
+    if (!u) return json({ error: "signed_out" }, 401);
+    switch (action) {
+      case "me":
+        return json(me(u, req), 200, { "Set-Cookie": sessionCookie(u.id) }); // refresh: stays signed in while used
+      case "runs":
+        return json(await listRuns(25));
+      case "prompts":
+        return json(await listPrompts());
+      case "run-items":
+        return json(await getRunItems(new URL(req.url).searchParams.get("id") || ""));
+      case "tasks": {
+        const tasks = await listTasks();
+        return json({
+          pulled_at: new Date().toISOString(),
+          tasks: tasks.map((r) => ({
+            item_id: r.item_id, ac: r.ac_number ?? "", cert: r.cert_number ?? "", set_name: r.set_name ?? "", player_name: r.player_name ?? "(no player)",
+            parallel_name: r.parallel_name, set_number: r.set_number, insert: r.insert, grade: (r.grade ?? "").toLowerCase(), sport: (r.sport ?? "").toLowerCase(),
+            ev: r.estimated_value, last_comp: r.last_comp, ev_date: r.ev_date, img: r.front_slab_picture_url, card_url: r.card_url, status: r.item_status,
+            requested_at: r.requested_at, extra: r.task_extra, pending: r.pending ?? null,
+          })),
+        });
+      }
+      case "approvals":
+        return json(await approvalQueue());
+      case "users":
+        return forbid(u, "admin") ?? json(await listUsers());
+      default:
+        return json({ error: "not found" }, 404);
+    }
+  } catch (e) {
+    return fail(e, 500);
+  }
+}
+
+export async function POST(req: Request, ctx: Ctx) {
+  const { action } = await ctx.params;
+  let body: Record<string, unknown> = {};
+  try {
+    body = await req.json();
+  } catch {
+    /* empty body */
+  }
+  const str = (k: string) => String(body[k] ?? "");
+
+  // ---- no sign-in needed ----
+  try {
+    switch (action) {
+      case "setup": {
+        const u = await setupFirstAdmin({ email: str("email"), name: str("name"), password: str("password"), code: str("code") });
+        return json({ user: u.name }, 200, { "Set-Cookie": sessionCookie(u.id) });
+      }
+      case "login": {
+        const u = await signIn(str("email"), str("password"));
+        return json({ user: u.name }, 200, { "Set-Cookie": sessionCookie(u.id) });
+      }
+      case "logout":
+        return json({ ok: true }, 200, { "Set-Cookie": clearCookie() });
+      case "invite-info":
+        return json(await inviteInfo(str("token")));
+      case "invite-accept": {
+        const u = await acceptInvite(str("token"), str("password"));
+        return json({ user: u.name }, 200, { "Set-Cookie": sessionCookie(u.id) });
+      }
+    }
+  } catch (e) {
+    return fail(e, action === "login" ? 401 : 400);
+  }
+
+  const u = await currentUser(req).catch(() => null);
+  if (!u) return json({ error: "signed_out" }, 401);
+
+  try {
+    switch (action) {
+      case "find": {
+        const { target, rest } = readTarget(str("text"));
+        if (body.scope === "tasks") {
+          // cards waiting for an estimate, narrowed by whatever was typed (blank = all of them)
+          const t0 = Date.now();
+          const all = await listTasks();
+          const f = filterTasks(all, rest);
+          return json({
+            scope: "tasks", target_ev: target, task_total: all.length,
+            parsed: { filters: f.display, post_filters: f.base ? { only_base: true } : {} },
+            has_filter: true, queries: [], ms: Date.now() - t0, total: f.rows.length, missing: f.missing,
+            cards: f.rows.map((r) => ({
+              item_id: r.item_id, ac: r.ac_number ?? "", cert: r.cert_number ?? "", sport: (r.sport ?? "").toLowerCase(),
+              set_name: r.set_name ?? "", player_name: r.player_name ?? "(no player)", parallel_name: r.parallel_name, set_number: r.set_number,
+              grading_company: (r.grading_company ?? "").toLowerCase(), grade: (r.grade ?? "").toLowerCase(), ev: r.estimated_value ?? 0,
+              last_comp: r.last_comp, img: r.front_slab_picture_url, card_url: r.card_url, insert: r.insert, parallel_total: r.parallel_total,
+              status: r.item_status, ev_date: r.ev_date, ev_age_days: r.ev_age_days, bin: r.storage_bin_id, slot: r.storage_bin_slot,
+              requested_at: r.requested_at, pending: r.pending ?? null,
+            })),
+          });
+        }
+        // pasted card rows (set · insert · player + # · parallel · grade) search exactly; anything else is a typed request
+        const pasted = parsePasted(rest);
+        const r = pasted
+          ? await (async () => { const t0 = Date.now(); const p = await searchPasted(pasted);
+              return { parsed: { filters: p.display, post_filters: {} }, has_filter: true, queries: p.queries, ms: Date.now() - t0, rows: p.rows, missing: p.missing }; })()
+          : await smartSearch(rest);
+        const LIMIT = 3000;
+        return json({
+          target_ev: target,
+          parsed: r.parsed,
+          has_filter: r.has_filter,
+          queries: r.queries,
+          ms: r.ms,
+          total: r.rows.length,
+          missing: r.missing,
+          cards: r.rows.slice(0, LIMIT).map((r) => ({
+            item_id: r.item_id, ac: r.ac_number ?? "", cert: r.cert_number ?? "", sport: (r.sport ?? "").toLowerCase(),
+            set_name: r.set_name ?? "", player_name: r.player_name ?? "(no player)", parallel_name: r.parallel_name,
+            grading_company: (r.grading_company ?? "").toLowerCase(), grade: (r.grade ?? "").toLowerCase(),
+            ev: r.estimated_value ?? 0, tag: r.tag, img: r.front_slab_picture_url, card_url: r.card_url,
+            insert: r.insert, parallel_total: r.parallel_total, status: r.item_status,
+            ev_date: r.ev_date, ev_age_days: r.ev_age_days, order_number: r.order_number,
+            times_sold_back: r.times_sold_back, bin: r.storage_bin_id, slot: r.storage_bin_slot,
+            purchase_cost: r.purchase_cost, purchase_location: r.purchase_location, po_number: r.po_number, set_number: r.set_number,
+            last_comp: r.last_comp,
+          })),
+        });
+      }
+      case "apply":
+        return (
+          forbid(u, "editor") ??
+          json(
+            await runSelection({
+              filters: (body.filters ?? {}) as CardFilters,
+              post_filters: (body.post_filters ?? {}) as PostFilters,
+              target_ev: body.target_ev === null || body.target_ev === undefined || body.target_ev === "" ? null : Number(body.target_ev),
+              values: (body.values ?? undefined) as Record<string, { ev?: number | null; last_comp?: number | null }> | undefined,
+              note: str("note"),
+              last_comp: body.last_comp === null || body.last_comp === undefined || body.last_comp === "" ? null : Number(body.last_comp),
+              url: body.url ? String(body.url) : null,
+              item_ids: Array.isArray(body.item_ids) ? (body.item_ids as string[]) : [],
+              queries: Array.isArray(body.queries) ? (body.queries as CardFilters[]) : undefined,
+              dry_run: body.dry_run === true,
+              actor: actorOf(u),
+            })
+          )
+        );
+      case "submit-tasks":
+        return forbid(u, "editor") ?? json(await submitTasks({ items: (Array.isArray(body.items) ? body.items : []) as SubmitItem[], actor: actorOf(u), dry_run: body.dry_run === true, include_copies: body.include_copies === true }));
+      case "copies": {
+        // preview: identical warehouse copies of the given task cards
+        const ids = new Set((body.item_ids as string[]) ?? []);
+        const tasks = (await listTasks()).filter((t) => ids.has(t.item_id));
+        const m = await findCopies(tasks);
+        return json(Object.fromEntries([...m].map(([k, rows]) => [k, rows.map((r) => ({ item_id: r.item_id, ac: r.ac_number, ev: r.estimated_value, grade: r.grade, img: r.front_slab_picture_url, number_checked: (r as { number_checked?: boolean }).number_checked !== false }))])));
+      }
+      case "approve":
+        return forbid(u, "approver") ?? json(await approveQueued({ item_ids: body.all === true ? "all" : ((body.item_ids as string[]) ?? []), note: str("note") || undefined, actor: actorOf(u), dry_run: body.dry_run === true }));
+      case "withdraw":
+        return forbid(u, "editor") ?? json(await withdrawQueued({ item_ids: (body.item_ids as string[]) ?? [], actor: actorOf(u) }));
+      case "undo":
+        return forbid(u, "editor") ?? json(await undoRun({ run_id: str("run_id"), confirm: true, actor: actorOf(u) }));
+      case "probe":
+        // setup check, run as the signed-in admin's own admin account
+        return forbid(u, "admin") ?? json(await probeEv(str("item_id"), actorOf(u).session_user_id));
+      case "password":
+        await changePassword(u.id, str("current"), str("next"));
+        return json({ ok: true });
+      case "mcp-key":
+        return json({ url: `${origin(req)}/api/mcp?key=${await newMcpKey(u.id)}` });
+      case "mcp-key-revoke":
+        await revokeMcpKey(u.id);
+        return json({ ok: true });
+      case "prompts":
+        return json(await addPrompt(str("text"), u.name, body.name as string | undefined));
+      case "prompts-rename":
+        await renamePrompt(str("id"), str("name"));
+        return json({ ok: true });
+      case "prompts-delete":
+        await deletePrompt(str("id"));
+        return json({ ok: true });
+
+      // ---- user management (admins) ----
+      case "users-add": {
+        const f = forbid(u, "admin");
+        if (f) return f;
+        const r = await addUser({ email: str("email"), name: str("name"), role: str("role") as Role, admin_user_id: str("admin_user_id") || null }, u);
+        return json({ ...r, invite_url: `${origin(req)}/?invite=${r.invite_token}` });
+      }
+      case "users-update": {
+        const f = forbid(u, "admin");
+        if (f) return f;
+        await updateUser(str("id"), {
+          role: (body.role as Role) || undefined,
+          active: typeof body.active === "boolean" ? body.active : undefined,
+          admin_user_id: body.admin_user_id === undefined ? undefined : String(body.admin_user_id ?? ""),
+        }, u);
+        return json({ ok: true });
+      }
+      case "users-relink":
+        return forbid(u, "admin") ?? json({ admin_user_id: await relinkAdmin(str("id")) });
+      case "users-invite": {
+        const f = forbid(u, "admin");
+        if (f) return f;
+        const r = await resetInvite(str("id"));
+        return json({ invite_url: `${origin(req)}/?invite=${r.invite_token}` });
+      }
+      default:
+        return json({ error: "not found" }, 404);
+    }
+  } catch (e) {
+    return fail(e);
+  }
+}
