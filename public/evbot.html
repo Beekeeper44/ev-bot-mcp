@@ -184,6 +184,11 @@ dialog.info{max-width:760px;width:calc(100% - 32px);padding:0}
 .copyb{display:inline-flex;align-items:center;justify-content:center;min-width:22px;height:20px;margin-left:5px;padding:0 4px;border:1px solid var(--line);border-radius:5px;font-size:12px;line-height:1;cursor:copy;color:var(--dim);vertical-align:middle;user-select:none}
 .copyb:hover,.copyb:focus-visible{border-color:var(--go);color:var(--go);outline:none}
 .copyb.done{border-color:var(--go);color:var(--go);font-weight:800}
+.taglist.kinds{max-height:260px;overflow:auto}
+.taglist.kinds li{padding:0;border:0}
+.kindpick{all:unset;box-sizing:border-box;display:flex;justify-content:space-between;gap:12px;width:100%;padding:7px 8px;border-bottom:1px dashed var(--line);cursor:pointer;border-radius:6px}
+.kindpick:hover,.kindpick:focus-visible{background:color-mix(in srgb,var(--go) 12%,transparent);color:var(--go);outline:none}
+.focusbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;margin-top:10px;padding:8px 12px;border:1px solid var(--go);border-radius:10px;background:color-mix(in srgb,var(--go) 8%,transparent)}
 .copyv{font-weight:700;color:var(--text);cursor:copy;border-bottom:1px dashed var(--line);user-select:text}
 .copyv:hover{color:var(--go);border-bottom-color:var(--go)}
 .copyv.flash{color:var(--go);border-bottom-color:var(--go)}
@@ -522,6 +527,7 @@ async function find(text){
 function recompute(resetSelection){
   // tasks always need an estimate (even at the same value); warehouse cards already at the value are hidden
   S.rows=S.scope==="tasks"?S.matched:needsChange(S.matched,S.target);
+  if(S.kind) S.rows=S.rows.filter(r=>cardKey(r)===S.kind); // showing only one version of the card
   if(resetSelection||!S.selected) S.selected=new Set(S.rows.map(r=>r.item_id));
   else S.selected=new Set([...S.selected].filter(id=>S.rows.some(r=>r.item_id===id)));
   render();
@@ -559,7 +565,7 @@ function render(){
   const big=sel.filter(r=>evOf(r)!=null&&validTarget(evOf(r))&&isBig(r,evOf(r)));
   const needLc=sel.filter(lcMissing).length;
   const kinds=[...new Set(sel.map(cardKey))];
-  const vals=S.matched.map(r=>r.ev||0).filter(v=>v>0).sort((a,b)=>a-b);
+  const vals=S.rows.map(r=>r.ev||0).filter(v=>v>0).sort((a,b)=>a-b);
   const med=vals.length?vals[Math.floor(vals.length/2)]:null;
   const lab={insert:"insert",pasted:"pasted",note:"note",set_number:"card #",contains:"also matches",ac_number:"AC #",cert_number:"cert",player_name:"player",set_name:"set",parallel_name:"parallel",grading_company:"grader",grade:"grade",min_estimated_value:"current min",max_estimated_value:"current max",sport:"sport",tag:"tag"};
   const chips=Object.entries(S.filters).map(([k,v])=>`<span class="chip"><i>${Array.isArray(v)?`${lab[k]||k}s (${v.length})`:(lab[k]||k)}</i> ${esc(k.includes("value")?money(v):v==="__base__"?"base (no parallel)":Array.isArray(v)?v.join(" or "):String(v).replace("%"," "))}</span>`).join("")+(S.post&&S.post.only_base?`<span class="chip"><i>parallel</i> base only</span>`:"");
@@ -591,7 +597,12 @@ function render(){
     </div>
     ${S.missing&&S.missing.length&&!locked?`<div class="warn"><b>Nothing found for ${esc(S.missing.join(", "))}.</b> ${S.missing.length<[].concat(S.filters.player_name).length?"Showing only the names that matched.":"Nothing else was selected."}</div>`:""}
     ${needLc&&!locked?`<div class="warn"><b>${needLc} selected ${needLc===1?"card has":"cards have"} no last comp yet.</b> Enter one in the panel (or on the tile) — admin needs it on the first pass.</div>`:""}
-    ${kinds.length>1&&!locked&&S.scope!=="tasks"?`<div class="warn"><b>${kinds.length} different cards are selected.</b> They all get the panel value unless you type one on a tile. For a recomp, add the card number, parallel and grade so only identical copies match, or deselect the others.<ul class="taglist">${kinds.slice(0,8).map(k=>`<li><span>${esc(k)}</span><span>${sel.filter(r=>cardKey(r)===k).length}</span></li>`).join("")}</ul></div>`:""}
+    ${S.kind&&!locked?`<div class="focusbar"><span>Showing only <b>${esc(S.kind)}</b> · ${S.rows.length} ${S.rows.length===1?"copy":"copies"}</span><button class="btn" type="button" id="kindAll">Show all ${S.matched.length} cards</button></div>`:""}
+    ${!S.kind&&!locked&&S.scope!=="tasks"&&(()=>{ const all=[...new Set(S.rows.map(cardKey))]; if(all.length<2) return "";
+      const cnt=k=>S.rows.filter(r=>cardKey(r)===k).length, selN=k=>sel.filter(r=>cardKey(r)===k).length;
+      const order=all.sort((a,b)=>cnt(b)-cnt(a));
+      return `<div class="warn"><b>${all.length} different versions of this card matched.</b> Click one to work on only those copies — or keep them all and they all get the panel value (type on a tile for a different one).
+        <ul class="taglist kinds">${order.map(k=>`<li><button type="button" class="kindpick" data-kind="${esc(k)}"><span>${esc(k)}</span><span>${selN(k)===cnt(k)?cnt(k):`${selN(k)} of ${cnt(k)}`}</span></button></li>`).join("")}</ul></div>`; })()||""}
     ${big.length&&!locked?`<div class="warn"><b>${big.length} ${big.length===1?"card moves":"cards move"} more than ${window.BIG_PCT||50}%</b> (or had no value). They're marked on the tiles. Double-check them before submitting.</div>`:""}
   </div>`;
   const showRows=(S.phase==="done"&&!S.showAll)?S.done:S.rows;
@@ -736,6 +747,8 @@ function bindSummary(){
   const ei=$("#evIn"); if(ei){
     ei.oninput=()=>{const pos=ei.selectionStart;const v=ei.value.replace(/[$,\s]/g,"");S.target=v===""?null:Number(v);if(!Number.isFinite(S.target))S.target=null;recompute(true);const x=$("#evIn");x.focus();x.setSelectionRange(pos,pos)};
   }
+  document.querySelectorAll(".kindpick").forEach(b=>b.onclick=()=>{ S.kind=b.dataset.kind; recompute(true); scrollTo({top:0,behavior:"smooth"}); });
+  const ka=$("#kindAll"); if(ka) ka.onclick=()=>{ S.kind=null; recompute(true); };
   const cp=$("#cpIn"); if(cp) cp.onchange=()=>{S.withCopies=cp.checked; S.copiesKey=""; render();};
   const ni=$("#noteIn"); if(ni) ni.oninput=()=>{S.note=ni.value;ni.classList.toggle("need",!ni.value.trim());renderBar(S._n,S._big)};
   const li=$("#lcIn"); if(li) li.oninput=()=>{S.lastComp=li.value.replace(/[$,\s]/g,"");renderBar(S._n,S._big)};
