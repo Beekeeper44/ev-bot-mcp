@@ -639,6 +639,15 @@ const copyTarget=e=>(e.target.closest&&e.target.closest("[data-copy]"))||((docum
 document.addEventListener("click",e=>{const c=copyTarget(e); if(!c) return; e.preventDefault(); e.stopPropagation(); copyText(c);},true);
 document.addEventListener("mousedown",e=>{ if(copyTarget(e)) e.preventDefault(); },true); /* keep the tile from taking focus */
 document.addEventListener("keydown",e=>{const c=e.target.closest&&e.target.closest(".copyb"); if(!c||(e.key!=="Enter"&&e.key!==" ")) return; e.preventDefault(); e.stopPropagation(); copyText(c);},true);
+/* EV date: when it was last approved (an approval or a recomp). Older 4131 = task date only */
+const fmtDay=d=>{ if(!d) return ""; const m=String(d).match(/^(\d{4})-(\d{2})-(\d{2})/); return m?`${+m[2]}/${+m[3]}/${m[1]}`:esc(d); };
+const ago=n=>n==null?"":n<=0?"today":n===1?"1 day ago":`${n} days ago`;
+function evLine(r){
+  if(r.ev_source==="approved") return `EV approved <b>${fmtDay(r.ev_date)}</b> · ${ago(r.ev_age_days)}`;
+  if(r.ev_source==="task") return `EV <b>never approved</b> · queued ${fmtDay(r.ev_date)}`;
+  if(r.ev_source===null) return `EV <b>never approved</b>`;
+  return r.ev_age_days!=null?`EV <b>${r.ev_age_days}d</b> old`:""; // 4131 without EV_DATE_SOURCE
+}
 function tile(r){
   const on=S.selected.has(r.item_id);
   const h=HUE[r.player_name]??[...r.player_name].reduce((a,c)=>(a*31+c.charCodeAt(0))%360,7);
@@ -658,7 +667,7 @@ function tile(r){
     else{ const p=pct(r.ev,v), b=isBig(r,v);
       change=`<span class="pill old">${money2(r.ev||0)}</span><span class="dim">→</span><span class="pill new">${money2(v)}</span>${p!=null?`<span class="${b?"pill big":p>=0?"up":"down"}">${p>=0?"+":""}${p}%</span>`:`<span class="pill big">no value</span>`}`; }
   }
-  const facts=[r.last_comp!==undefined?`Last comp <b>${r.last_comp!=null?money2(r.last_comp):"none"}</b>`:"", r.requested_at?`Requested <b>${when(r.requested_at)}</b>`:"", r.cert?`Cert ${copyVal(r.cert,"cert")}${copyBtn(r.cert,"cert")}`:"", r.tag?`Tag <b>${esc(r.tag)}</b>`:"", (r.bin||r.slot)?`Bin <b>${esc(r.bin??"—")}</b> · Slot <b>${esc(r.slot??"—")}</b>`:"", r.status?`Status <b>${esc(r.status)}</b>`:"", r.ev_age_days!=null?`EV <b>${r.ev_age_days}d</b> old`:""].filter(Boolean).join("<br>");
+  const facts=[r.last_comp!==undefined?`Last comp <b>${r.last_comp!=null?money2(r.last_comp):"none"}</b>`:"", r.requested_at?`Requested <b>${when(r.requested_at)}</b>`:"", r.cert?`Cert ${copyVal(r.cert,"cert")}${copyBtn(r.cert,"cert")}`:"", r.tag?`Tag <b>${esc(r.tag)}</b>`:"", (r.bin||r.slot)?`Bin <b>${esc(r.bin??"—")}</b> · Slot <b>${esc(r.slot??"—")}</b>`:"", r.status?`Status <b>${esc(r.status)}</b>`:"", evLine(r)].filter(Boolean).join("<br>");
   return `<div class="tw"><button type="button" class="infob" data-info="${esc(r.item_id)}" aria-label="Details for ${esc(r.player_name)}" title="Details">i</button><button type="button" class="tile" data-id="${r.item_id}" aria-pressed="${on}" ${S.phase!=="review"?"disabled":""} aria-label="${esc(r.player_name)} ${esc(r.set_name)}">
     <span class="check" aria-hidden="true">${on?"✓":""}</span>
     <div class="slab"><div class="lbl"><span>${esc((r.grade||"").toUpperCase())}</span><span>${r.parallel_total?"/"+esc(r.parallel_total):""}</span></div>
@@ -699,7 +708,7 @@ function showInfo(id){
       <dl>
         ${row("Grade",esc((r.grade||"").toUpperCase()))}
         ${row("Estimated value",money2(r.ev))}
-        ${row("EV date",esc(r.ev_date))}${row("EV age",r.ev_age_days!=null?r.ev_age_days+" days":"")}
+        ${row(r.ev_source==="approved"?"EV approved":r.ev_source==="task"?"EV queued (not approved)":"EV date",fmtDay(r.ev_date))}${row("EV age",r.ev_date?ago(r.ev_age_days):"")}${row("Last comp",r.last_comp!=null?money2(r.last_comp):r.last_comp===null?"none":"")}
         ${row("Current tag",r.tag?`<span class="pill">${esc(r.tag)}</span>`:"no tag")}
         ${row("Status",esc(r.status))}
         ${row("Sport",esc(r.sport))}

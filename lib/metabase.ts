@@ -49,6 +49,7 @@ export type CardRow = {
   parallel_total: string | null;
   ev_date: string | null;
   ev_age_days: number | null;
+  ev_source?: "approved" | "task" | null; // what ESTIMATED_VALUE_DATE means (4131 EV_DATE_SOURCE)
   order_number: string | null;
   times_sold_back: number | null;
   storage_bin_id: string | null;
@@ -179,6 +180,7 @@ export function toRow(obj: Record<string, unknown>): CardRow {
     parallel_total: s(o.PARALLEL_TOTAL),
     ev_date: s(o.ESTIMATED_VALUE_DATE),
     ev_age_days: n(o.EV_AGE_DAYS),
+    ...("EV_DATE_SOURCE" in o ? { ev_source: (s(o.EV_DATE_SOURCE) as "approved" | "task" | null) } : {}),
     order_number: s(o.NUMBER),
     times_sold_back: n(o.TIMES_SOLD_BACK),
     storage_bin_id: s(o.STORAGE_BIN_ID),

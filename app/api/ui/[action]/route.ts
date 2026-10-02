@@ -137,7 +137,7 @@ export async function POST(req: Request, ctx: Ctx) {
               set_name: r.set_name ?? "", player_name: r.player_name ?? "(no player)", parallel_name: r.parallel_name, set_number: r.set_number,
               grading_company: (r.grading_company ?? "").toLowerCase(), grade: (r.grade ?? "").toLowerCase(), ev: r.estimated_value ?? 0,
               last_comp: r.last_comp, img: r.front_slab_picture_url, card_url: r.card_url, insert: r.insert, parallel_total: r.parallel_total,
-              status: r.item_status, ev_date: r.ev_date, ev_age_days: r.ev_age_days, bin: r.storage_bin_id, slot: r.storage_bin_slot,
+              status: r.item_status, ev_date: r.ev_date, ev_age_days: r.ev_age_days, ev_source: r.ev_source, bin: r.storage_bin_id, slot: r.storage_bin_slot,
               requested_at: r.requested_at, pending: r.pending ?? null,
             })),
           });
@@ -181,7 +181,7 @@ export async function POST(req: Request, ctx: Ctx) {
             grading_company: (r.grading_company ?? "").toLowerCase(), grade: (r.grade ?? "").toLowerCase(),
             ev: r.estimated_value ?? 0, tag: r.tag, img: r.front_slab_picture_url, card_url: r.card_url,
             insert: r.insert, parallel_total: r.parallel_total, status: r.item_status,
-            ev_date: r.ev_date, ev_age_days: r.ev_age_days, order_number: r.order_number,
+            ev_date: r.ev_date, ev_age_days: r.ev_age_days, ev_source: r.ev_source, order_number: r.order_number,
             times_sold_back: r.times_sold_back, bin: r.storage_bin_id, slot: r.storage_bin_slot,
             purchase_cost: r.purchase_cost, purchase_location: r.purchase_location, po_number: r.po_number, set_number: r.set_number,
             last_comp: r.last_comp,
