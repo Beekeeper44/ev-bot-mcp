@@ -35,6 +35,8 @@ export type Actor = User & { session_user_id: string; attribution: "own" | "shar
 
 export function actorOf(u: User): Actor {
   if (u.admin_user_id) return { ...u, session_user_id: u.admin_user_id, attribution: "own", note_suffix: "" };
+  // the person who set ev-bot up owns ADMIN_SESSION_USER_ID — treat it as their own login (no "· by" suffix)
+  if (u.created_by === "setup" && config.sessionUserIdOrNull()) return { ...u, admin_user_id: config.sessionUserIdOrNull(), session_user_id: config.sessionUserId(), attribution: "own", note_suffix: "" };
   if (!config.sharedSessionFallback()) throw new Error(`${u.name} isn't linked to an admin account yet. Ask an EV Bot admin to link them in Users.`);
   return { ...u, session_user_id: config.sessionUserId(), attribution: "shared", note_suffix: ` · by ${u.name}` };
 }

@@ -612,6 +612,7 @@ function render(){
   if(S.phase==="done") $("#summary").innerHTML=resultHeader();
   const sa=$("#showAll"); if(sa) sa.onclick=()=>{S.showAll=!S.showAll;render()};
   S._n=sel.length; S._big=big.length; bindSummary(); bindTiles(); renderBar(sel.length,big.length); scheduleCopies();
+  if(S.phase==="review"){ clearTimeout(liveT2); liveT2=setTimeout(fetchLive,150); }
 }
 function resultHeader(){
   const n=S.done.length, others=S.rows.length-n;
@@ -642,7 +643,29 @@ document.addEventListener("keydown",e=>{const c=e.target.closest&&e.target.close
 /* EV date: when it was last approved (an approval or a recomp). Older 4131 = task date only */
 const fmtDay=d=>{ if(!d) return ""; const m=String(d).match(/^(\d{4})-(\d{2})-(\d{2})/); return m?`${+m[2]}/${+m[3]}/${m[1]}`:esc(d); };
 const ago=n=>n==null?"":n<=0?"today":n===1?"1 day ago":`${n} days ago`;
+/* live from admin (Snowflake can lag): newest approved / recomp, and anything newer still waiting */
+const dayOf=iso=>{const d=new Date(iso); return isNaN(d)?"":`${d.getMonth()+1}/${d.getDate()}/${d.getFullYear()}`;};
+const daysAgo=iso=>{const d=new Date(iso); if(isNaN(d)) return null; const a=new Date(); a.setHours(0,0,0,0); const b=new Date(d); b.setHours(0,0,0,0); return Math.round((a-b)/864e5);};
+let liveT2, liveBusy=false;
+async function fetchLive(){
+  if(!S||liveBusy) return; S.live=S.live||new Map();
+  const ids=S.rows.slice(0,S.limit||240).map(r=>r.item_id).filter(id=>!S.live.has(id)).slice(0,100);
+  if(!ids.length) return;
+  liveBusy=true; const mine=S;
+  try{ const res=await api("ev-live",{item_ids:ids}); if(mine!==S) return;
+    for(const id of ids){ const v=res[id]; S.live.set(id,v||null);
+      const r=S.rows.find(x=>x.item_id===id); if(r&&v&&v.live){ if(v.live.ev!=null) r.ev=v.live.ev; if(v.live.last_comp!=null) r.last_comp=v.live.last_comp; } }
+  }catch{ for(const id of ids) S.live.set(id,null); }
+  finally{ liveBusy=false; }
+  if(mine===S&&S.phase!=="working"){ render(); }
+}
 function evLine(r){
+  const lv=S&&S.live&&S.live.get(r.item_id);
+  if(lv){
+    const L=lv.live, W=lv.waiting;
+    const head=L?`EV ${L.status==="approved"?"approved":"recomp"} <b>${dayOf(L.at)}</b> · ${ago(daysAgo(L.at))}`:`EV <b>never approved</b>`;
+    return head+(W?`<br><span class="pend">Waiting: ${money2(W.ev)} ${W.status} ${dayOf(W.at)}</span>`:"");
+  }
   if(r.ev_source==="approved") return `EV approved <b>${fmtDay(r.ev_date)}</b> · ${ago(r.ev_age_days)}`;
   if(r.ev_source==="task") return `EV <b>never approved</b> · queued ${fmtDay(r.ev_date)}`;
   if(r.ev_source===null) return `EV <b>never approved</b>`;

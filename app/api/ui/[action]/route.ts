@@ -11,7 +11,7 @@ import { parsePasted, searchPasted } from "@/lib/paste";
 import { readTags, hasTag } from "@/lib/tagfilter";
 import { titleSearch, looksLikeTcg } from "@/lib/title";
 import { queryCards } from "@/lib/metabase";
-import { probeEv } from "@/lib/admin";
+import { probeEv, openAdminSession, liveEv, type LiveEv } from "@/lib/admin";
 import {
   can, actorOf, currentUser, sessionCookie, clearCookie, signIn, needsSetup, setupFirstAdmin, inviteInfo, acceptInvite,
   changePassword, listUsers, addUser, updateUser, relinkAdmin, resetInvite, newMcpKey, revokeMcpKey, type User, type Role,
@@ -28,7 +28,8 @@ const forbid = (u: User, role: Role) => (can(u, role) ? null : json({ error: `Th
 type Ctx = { params: Promise<{ action: string }> };
 
 function me(u: User, req: Request) {
-  const shared = !u.admin_user_id;
+  let shared = !u.admin_user_id;
+  try { shared = actorOf(u).attribution === "shared"; } catch { /* not linked, no fallback */ }
   return {
     user: u.name, email: u.email, role: u.role, id: u.id,
     can_write: can(u, "editor") && (!shared || config.sharedSessionFallback()),
@@ -222,6 +223,22 @@ export async function POST(req: Request, ctx: Ctx) {
         return forbid(u, "editor") ?? json(await withdrawQueued({ item_ids: (body.item_ids as string[]) ?? [], actor: actorOf(u) }));
       case "undo":
         return forbid(u, "editor") ?? json(await undoRun({ run_id: str("run_id"), confirm: true, actor: actorOf(u) }));
+      case "ev-live": {
+        // live EV history from admin for the cards on screen (Snowflake can lag): newest approved / recomp + anything waiting
+        const ids = [...new Set(((body.item_ids as string[]) ?? []).filter((x) => /^[0-9a-f-]{36}$/i.test(x)))].slice(0, 100);
+        if (!ids.length) return json({});
+        const session = await openAdminSession(actorOf(u).session_user_id);
+        try {
+          const out: Record<string, LiveEv | null> = {};
+          let i = 0;
+          await Promise.all(Array.from({ length: 8 }, async () => {
+            while (i < ids.length) { const id = ids[i++]; out[id] = (await liveEv(session, id)) ?? null; }
+          }));
+          return json(out);
+        } finally {
+          await session.revoke();
+        }
+      }
       case "probe":
         // setup check, run as the signed-in admin's own admin account
         return forbid(u, "admin") ?? json(await probeEv(str("item_id"), actorOf(u).session_user_id));

@@ -33,6 +33,8 @@ export const config = {
   evPath: () => process.env.EV_PATH || "/admin/estimate-value",
   evSubmitStatus: () => process.env.EV_SUBMIT_STATUS || "done",
   evApproveStatus: () => process.env.EV_APPROVE_STATUS || "approved",
+  // statuses that mean "this value is live": an approval, or a recomp saved with skip-verify
+  evLiveStatuses: () => (process.env.EV_LIVE_STATUSES || "approved,done_skip_verify").split(",").map((x) => x.trim()).filter(Boolean),
   // Where the card's cardTypeId / parallelId / grade / gradingCompany come from on the first submit
   // (captured: GET /admin/v1/cards/{id}; grade is "overall" there)
   evCardPath: () => process.env.EV_CARD_PATH || "/admin/v1/cards/{id}",

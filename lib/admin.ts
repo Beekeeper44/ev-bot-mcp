@@ -139,15 +139,35 @@ export async function estimateHistory(session: AdminSession, itemId: string): Pr
   }
 }
 
-/** What's live for the card: its latest approved estimate (or latest of any status). undefined = couldn't read. */
+const recDate = (r: EstimateRecord) => String(r.finishedAt ?? r.createdAt ?? "");
+const byNewest = (a: EstimateRecord, b: EstimateRecord) => recDate(b).localeCompare(recDate(a));
+
+/** What's live for the card: its newest approved / skip-verify recomp estimate. undefined = couldn't read. */
 export async function readEv(session: AdminSession, itemId: string): Promise<EvSnapshot | undefined> {
   const mine = await estimateHistory(session, itemId);
   if (!mine) return undefined;
-  const byNewest = (a: EstimateRecord, b: EstimateRecord) => String(b.finishedAt ?? b.createdAt ?? "").localeCompare(String(a.finishedAt ?? a.createdAt ?? ""));
-  const approved = mine.filter((r) => r.gradingTaskStatus === config.evApproveStatus()).sort(byNewest);
-  const pick = approved[0] ?? [...mine].sort(byNewest)[0];
+  const live = mine.filter((r) => config.evLiveStatuses().includes(String(r.gradingTaskStatus))).sort(byNewest);
+  const pick = live[0] ?? [...mine].sort(byNewest)[0];
   if (!pick) return { ev: null, last_comp: null, url: null, note: null };
   return { ev: dollars(pick.estimatedValueCents), last_comp: dollars(pick.lastCompValueCents), url: str(pick.url), note: str(pick.note) };
+}
+
+/** For the screen: the card's live estimate (newest approved / skip-verify recomp) and any newer one still waiting. */
+export type LiveEv = {
+  live: { ev: number | null; last_comp: number | null; at: string; status: string; note: string | null } | null;
+  waiting: { ev: number | null; last_comp: number | null; at: string; status: string } | null;
+};
+export async function liveEv(session: AdminSession, itemId: string): Promise<LiveEv | undefined> {
+  const mine = await estimateHistory(session, itemId);
+  if (!mine) return undefined;
+  const sorted = [...mine].sort(byNewest);
+  const isLive = (r: EstimateRecord) => config.evLiveStatuses().includes(String(r.gradingTaskStatus));
+  const l = sorted.find(isLive);
+  const newer = sorted.find((r) => !isLive(r) && (!l || recDate(r) > recDate(l)));
+  return {
+    live: l ? { ev: dollars(l.estimatedValueCents), last_comp: dollars(l.lastCompValueCents), at: recDate(l), status: String(l.gradingTaskStatus), note: str(l.note) } : null,
+    waiting: newer ? { ev: dollars(newer.estimatedValueCents), last_comp: dollars(newer.lastCompValueCents), at: recDate(newer), status: String(newer.gradingTaskStatus) } : null,
+  };
 }
 
 /** The exact body admin's page sends. */

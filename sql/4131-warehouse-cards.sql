@@ -145,9 +145,8 @@ FROM (
     GROUP BY rpi.item_id
   ) rc ON rc.card_id = cards.id
   LEFT JOIN (
-    /* NEW 2026-10-01: newest APPROVED estimate per card — this is the
-       "approved" box on the admin estimate-value page (an approval, a recomp,
-       or an ev-bot approve). Timestamps are timestamptz; under the LA session
+    /* NEW 2026-10-01: newest LIVE estimate per card — the newest "approved" or
+       "done_skip_verify" (recomp) box on the admin estimate-value page. Timestamps are timestamptz; under the LA session
        ::timestamp is already LA, same as the task date below. */
     SELECT card_id, ev_approved_date, last_comp
     FROM (
@@ -161,7 +160,8 @@ FROM (
         ) AS rn
       FROM APP_PROD.ADMIN.ESTIMATED_VALUE
       WHERE NOT COALESCE(_SNOWFLAKE_DELETED, FALSE)
-        AND grading_task_status = 'approved'
+        -- live values: approvals AND recomps saved with skip-verify
+        AND grading_task_status IN ('approved', 'done_skip_verify')
     ) x
     WHERE rn = 1
   ) eva ON eva.card_id = cards.id
