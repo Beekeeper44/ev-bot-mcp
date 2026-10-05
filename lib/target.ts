@@ -5,7 +5,7 @@
 const NUM = "\\$?\\s*([\\d,]+(?:\\.\\d{1,2})?)\\s*(k)?";
 const RANGE = new RegExp("between\\s*\\$?\\s*[\\d,.]+\\s*k?\\s*(?:and|to|-|–)\\s*\\$?\\s*[\\d,.]+\\s*k?|\\$\\s*[\\d,.]+\\s*k?\\s*(?:-|–|to)\\s*\\$\\s*[\\d,.]+\\s*k?", "gi");
 const TARGET = new RegExp(
-  "(?:\\b(?:set|change|update|move|make)\\s+(?:the\\s+)?(?:ev|estimated value|estimate(?:d)?|value|them|it|all)?\\s*(?:to|=|at)\\s*|\\b(?:ev|estimated value|new value|value)\\s*(?:to|=|:|of|at)?\\s*|\\s(?:to|=|@|→|->)\\s*)" + NUM + "(?![\\d,.]*\\s*(?:\\+|-|–))",
+  "(?:\\b(?:set|change|update|move|make)\\s+(?:the\\s+)?(?:ev|estimated value|estimate(?:d)?|value|them|it|all)?\\s*(?:to|=|at)\\s*|\\b(?:ev|estimated value|new value|value)\\s*(?:to|=|:|of|at)?\\s*|\\s(?:to|=|@|→|->)\\s*)" + NUM + "(?![\\d,.]*\\s*(?:k\\s*)?(?:\\+|-|–|or more|or greater|or higher|or above|and up|and above|plus\\b))",
   "gi"
 );
 

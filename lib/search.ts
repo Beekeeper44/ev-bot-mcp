@@ -61,12 +61,12 @@ function namePhrases(text: string, used: string[]) {
 }
 
 
-export async function smartSearch(text: string) {
+export async function smartSearch(text: string, extra: CardFilters = {}) {
   const t0 = Date.now();
   const cn = extractCardNumbers(text);
   const ids = extractIds(cn.rest);
   const parsed = parseRequest(ids.rest, buildLexiconFromRows([]));
-  const base: CardFilters = { ...(parsed.filters as CardFilters) };
+  const base: CardFilters = { ...(parsed.filters as CardFilters), ...extra };
   delete base.player_name;
   delete base.ac_number;
   delete base.cert_number;

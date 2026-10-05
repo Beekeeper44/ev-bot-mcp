@@ -185,9 +185,17 @@ dialog.info{max-width:760px;width:calc(100% - 32px);padding:0}
 .copyb:hover,.copyb:focus-visible{border-color:var(--go);color:var(--go);outline:none}
 .copyb.done{border-color:var(--go);color:var(--go);font-weight:800}
 .taglist.kinds{max-height:260px;overflow:auto}
+.bands{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:10px}
+.band{font:inherit;font-size:12px;padding:5px 10px;border:1px solid var(--line);border-radius:999px;background:var(--bg);color:var(--text);cursor:pointer}
+.band .cnt{color:var(--dim);margin-left:4px}
+.band[aria-pressed="true"],.band.on{border-color:var(--go);background:var(--go);color:var(--go-ink)}
+.band[aria-pressed="true"] .cnt{color:inherit;opacity:.8}
+.pager{display:flex;gap:12px;align-items:center;justify-content:center;margin:12px 0}
 .taglist.kinds li{padding:0;border:0}
 .kindpick{all:unset;box-sizing:border-box;display:flex;justify-content:space-between;gap:12px;width:100%;padding:7px 8px;border-bottom:1px dashed var(--line);cursor:pointer;border-radius:6px}
 .kindpick:hover,.kindpick:focus-visible{background:color-mix(in srgb,var(--go) 12%,transparent);color:var(--go);outline:none}
+.kindpick.on{background:color-mix(in srgb,var(--go) 18%,transparent);color:var(--go);font-weight:700}
+.versions .focusbar{margin-top:0}
 .focusbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;margin-top:10px;padding:8px 12px;border:1px solid var(--go);border-radius:10px;background:color-mix(in srgb,var(--go) 8%,transparent)}
 .copyv{font-weight:700;color:var(--text);cursor:copy;border-bottom:1px dashed var(--line);user-select:text}
 .copyv:hover{color:var(--go);border-bottom-color:var(--go)}
@@ -277,6 +285,7 @@ dialog .acts{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}
       <button class="btn" type="button" id="saveBtn">Save prompt</button>
       <button class="btn primary" type="submit">Find cards</button>
     </form>
+    <div class="bands" id="bandbar" role="group" aria-label="EV range"></div>
     <div class="savednote small" id="saveNote" aria-live="polite"></div>
     <div class="voicenote" id="voiceNote" aria-live="polite"></div>
 
@@ -459,7 +468,7 @@ function readExtras(text){
 function readTarget(text){
   const NUM="\\$?\\s*([\\d,]+(?:\\.\\d{1,2})?)\\s*(k)?";
   const masked=text.replace(/between\s*\$?\s*[\d,.]+\s*k?\s*(?:and|to|-|–)\s*\$?\s*[\d,.]+\s*k?|\$\s*[\d,.]+\s*k?\s*(?:-|–|to)\s*\$\s*[\d,.]+\s*k?/gi,m=>" ".repeat(m.length));
-  const re=new RegExp("(?:\\b(?:set|change|update|move|make)\\s+(?:the\\s+)?(?:ev|estimated value|estimate(?:d)?|value|them|it|all)?\\s*(?:to|=|at)\\s*|\\b(?:ev|estimated value|new value|value)\\s*(?:to|=|:|of|at)?\\s*|\\s(?:to|=|@|→|->)\\s*)"+NUM+"(?![\\d,.]*\\s*(?:\\+|-|–))","gi");
+  const re=new RegExp("(?:\\b(?:set|change|update|move|make)\\s+(?:the\\s+)?(?:ev|estimated value|estimate(?:d)?|value|them|it|all)?\\s*(?:to|=|at)\\s*|\\b(?:ev|estimated value|new value|value)\\s*(?:to|=|:|of|at)?\\s*|\\s(?:to|=|@|→|->)\\s*)"+NUM+"(?![\\d,.]*\\s*(?:k\\s*)?(?:\\+|-|–|or more|or greater|or higher|or above|and up|and above|plus\\b))","gi");
   let m,last=null; while((m=re.exec(masked))) last=m;
   if(!last) return null;
   const n=Number(last[1].replace(/,/g,""))*(last[2]?1000:1);
@@ -502,14 +511,21 @@ async function renderHistory(){
 /* ---------- find ---------- */
 let findSeq=0;
 let SCOPE="warehouse";
+/* EV range tabs: filter what's on screen; the picked tab also goes with the next search */
+const BANDS=[{id:"all",label:"All"},{id:"u500",label:"<$499",max:499.99},{id:"500",label:"$500–$999",min:500,max:999.99},{id:"1k",label:"$1,000–$2,499",min:1000,max:2499.99},{id:"2500",label:"$2,500–$4,999",min:2500,max:4999.99},{id:"5k",label:"$5,000+",min:5000}];
+let BAND="all";
+const inBand=(r,b)=>{const B=BANDS.find(x=>x.id===b)||BANDS[0]; const v=r.ev||0; return (B.min==null||v>=B.min)&&(B.max==null||v<=B.max);};
+const bandFor=(min,max)=>{const b=BANDS.find(x=>x.id!=="all"&&(x.min??null)===(min??null)&&((x.max==null&&max==null)||(x.max!=null&&max!=null&&Math.floor(x.max)===Math.floor(max)))); return b?b.id:null;};
+const PAGE=200;
 async function find(text){
   requestAnimationFrame(()=>{const i=$("#input");i.style.height="auto";i.style.height=Math.min(i.scrollHeight+2,200)+"px"});
-  if(!text.trim()&&SCOPE!=="tasks") return;
+  if(!text.trim()&&SCOPE!=="tasks"&&BAND==="all") return;
   const seq=++findSeq;
   const ex=readExtras(text);
   $("#empty").hidden=false; $("#empty").innerHTML=`<span class="spin"></span>${SCOPE==="tasks"?"Pulling cards waiting for an estimate…":"Searching Metabase 4131…"}`; $("#summary").innerHTML=""; $("#grid").innerHTML=""; $("#bar").hidden=true;
   let res;
-  try{ res=await api("find",{text:ex.rest,scope:SCOPE}); }
+  const B=BANDS.find(x=>x.id===BAND)||BANDS[0];
+  try{ res=await api("find",{text:ex.rest,scope:SCOPE,min_ev:B.min??null,max_ev:B.max??null}); }
   catch(e){ if(seq===findSeq) showEmpty(e.message); return; }
   if(seq!==findSeq) return;
   const at=new Date().toLocaleTimeString([], {hour:"numeric",minute:"2-digit",second:"2-digit"});
@@ -519,8 +535,10 @@ async function find(text){
   const p=res.parsed;
   const keep=S&&S.target!=null&&res.target_ev==null?S.target:null; // keep a value already entered when only the cards change
   const carry=S?{note:S.note||"",lastComp:S.lastComp??"",url:S.url||""}:{note:window.DEFAULT_NOTE||"mcp done",lastComp:"",url:""};
+  // a range typed in the request picks the matching tab (or "custom")
+  if(res.ev_range&&res.ev_range.typed){ BAND=bandFor(res.ev_range.min,res.ev_range.max)||"all"; }
   if(ex.note!=null) carry.note=ex.note; if(ex.lc!=null) carry.lastComp=ex.lc; if(ex.url!=null) carry.url=ex.url;
-  S={...carry, scope:res.scope||"warehouse", over:new Map(), withCopies:S?S.withCopies!==false:true, copies:{}, copiesKey:"", queries:res.queries, filters:p.filters, post:p.post_filters, target:res.target_ev??keep, matched:res.cards, total:res.total, missing:res.missing||[], phase:"review", prev:new Map(), limit:240};
+  S={...carry, scope:res.scope||"warehouse", over:new Map(), withCopies:S?S.withCopies!==false:true, copies:{}, copiesKey:"", queries:res.queries, filters:p.filters, post:p.post_filters, target:res.target_ev??keep, matched:res.cards, total:res.total, missing:res.missing||[], phase:"review", prev:new Map(), limit:240, page:0, lastText:text, evRange:res.ev_range||{}, serverBand:!!(res.ev_range&&(res.ev_range.min!=null||res.ev_range.max!=null))};
   $("#confirmBtn").hidden=false; $("#dryWrap").hidden=false;
   recompute(true);
 }
@@ -528,11 +546,12 @@ function recompute(resetSelection){
   // tasks always need an estimate (even at the same value); warehouse cards already at the value are hidden
   S.rows=S.scope==="tasks"?S.matched:needsChange(S.matched,S.target);
   if(S.kind) S.rows=S.rows.filter(r=>cardKey(r)===S.kind); // showing only one version of the card
+  if(BAND!=="all") S.rows=S.rows.filter(r=>inBand(r,BAND));
   if(resetSelection||!S.selected) S.selected=new Set(S.rows.map(r=>r.item_id));
   else S.selected=new Set([...S.selected].filter(id=>S.rows.some(r=>r.item_id===id)));
   render();
 }
-function showEmpty(msg){S=null;$("#summary").innerHTML="";$("#grid").innerHTML="";$("#empty").hidden=false;$("#empty").textContent=msg;$("#bar").hidden=true}
+function showEmpty(msg){S=null;$("#summary").innerHTML="";$("#grid").innerHTML="";$("#empty").hidden=false;$("#empty").textContent=msg;$("#bar").hidden=true;renderBands()}
 
 /* duplicates: identical warehouse copies of the selected task cards, fetched for a preview */
 const copiesOf=id=>(S&&S.withCopies&&S.copies&&S.copies[id])||[];
@@ -556,7 +575,8 @@ const cardReady=r=>{const v=evOf(r); return v!=null&&validTarget(v)&&!lcMissing(
 function render(){
   if(!S){return}
   $("#empty").hidden=!!S.rows.length;
-  if(!S.rows.length){$("#empty").textContent=S.scope==="tasks"&&!S.matched.length&&!(S.missing&&S.missing.length)?"No cards are waiting for an estimate. 🎉":S.matched.length?`${S.matched.length} cards matched, and all of them are already ${money2(S.target)}.`:`No cards matched${S.missing&&S.missing.length?" "+esc(S.missing.join(", ")):""}. Check the spelling, or try fewer filters.`;}
+  if(!S.rows.length&&BAND!=="all"){ const B=BANDS.find(x=>x.id===BAND); $("#empty").innerHTML=`No cards in <b>${esc(B.label)}</b>${S.lastText?` for “${esc(S.lastText)}”`:""}. Pick another range above, or <button class="btn link" type="button" id="bandAll">show all ranges</button>.`; const ba=$("#bandAll"); if(ba) ba.onclick=()=>{BAND="all"; find(S.lastText||"");}; }
+  else if(!S.rows.length){$("#empty").textContent=S.scope==="tasks"&&!S.matched.length&&!(S.missing&&S.missing.length)?"No cards are waiting for an estimate. 🎉":S.matched.length?`${S.matched.length} cards matched, and all of them are already ${money2(S.target)}.`:`No cards matched${S.missing&&S.missing.length?" "+esc(S.missing.join(", ")):""}. Check the spelling, or try fewer filters.`;}
   const sel=S.rows.filter(r=>S.selected.has(r.item_id));
   const T=S.target, ok=validTarget(T);
   const evNow=sel.reduce((a,r)=>a+(r.ev||0),0);
@@ -567,7 +587,7 @@ function render(){
   const kinds=[...new Set(sel.map(cardKey))];
   const vals=S.rows.map(r=>r.ev||0).filter(v=>v>0).sort((a,b)=>a-b);
   const med=vals.length?vals[Math.floor(vals.length/2)]:null;
-  const lab={insert:"insert",pasted:"pasted",note:"note",set_number:"card #",contains:"also matches",ac_number:"AC #",cert_number:"cert",player_name:"player",set_name:"set",parallel_name:"parallel",grading_company:"grader",grade:"grade",min_estimated_value:"current min",max_estimated_value:"current max",sport:"sport",tag:"tag"};
+  const lab={insert:"insert",pasted:"pasted",note:"note",set_number:"card #",contains:"also matches",ac_number:"AC #",cert_number:"cert",player_name:"player",set_name:"set",parallel_name:"parallel",grading_company:"grader",grade:"grade",min_estimated_value:"EV from",max_estimated_value:"EV up to",sport:"sport",tag:"tag"};
   const chips=Object.entries(S.filters).map(([k,v])=>`<span class="chip"><i>${Array.isArray(v)?`${lab[k]||k}s (${v.length})`:(lab[k]||k)}</i> ${esc(k.includes("value")?money(v):v==="__base__"?"base (no parallel)":Array.isArray(v)?v.join(" or "):String(v).replace("%"," "))}</span>`).join("")+(S.post&&S.post.only_base?`<span class="chip"><i>parallel</i> base only</span>`:"");
   const locked=S.phase!=="review";
   $("#summary").innerHTML=`<div class="summary">
@@ -586,32 +606,45 @@ function render(){
         <button class="btn" type="button" data-v="${vals[vals.length-1]}">Use highest</button>
         <span class="dim small">Applies to every selected card; type on a tile to give one card its own value.</span></div>`}
       <div class="chips">${chips}</div>
+
     </div>
     <div class="totals">
       <div class="n">${sel.length}<span class="dim small" style="font-size:13px;font-weight:500"> of ${S.rows.length} selected</span></div>
       ${S.scope==="tasks"&&S.withCopies&&sel.some(r=>copiesOf(r.item_id).length)?`<div class="small">+ ${sel.reduce((a,r)=>a+copiesOf(r.item_id).length,0)} copies</div>`:""}
       <div class="dim small">${money(evNow)} now${allPriced?` → <b>${money(evNew)}</b> <span class="${evNew>=evNow?"up":"down"}">(${evNew>=evNow?"+":"−"}${money(Math.abs(evNew-evNow))})</span>`:""}</div>
       ${ok&&!locked&&sel.some(r=>sameEv(r.ev,evOf(r)))?`<div class="dim small">${sel.filter(r=>sameEv(r.ev,evOf(r))).length} already at this value (still submitted)</div>`:""}
-      ${S.total>S.matched.length?`<div class="small" style="color:var(--warn)">Showing the first ${S.matched.length.toLocaleString()} of ${S.total.toLocaleString()} matches. Narrow the request.</div>`:""}
+      ${S.total>S.matched.length?`<div class="small" style="color:var(--warn)">Loaded the first ${S.matched.length.toLocaleString()} of ${S.total.toLocaleString()} matches — pick an EV range or narrow the request.</div>`:""}
       ${locked?"":`<div class="selbar"><button class="btn link" type="button" id="all">Select all</button><button class="btn link" type="button" id="none">Clear</button></div>`}
     </div>
     ${S.missing&&S.missing.length&&!locked?`<div class="warn"><b>Nothing found for ${esc(S.missing.join(", "))}.</b> ${S.missing.length<[].concat(S.filters.player_name).length?"Showing only the names that matched.":"Nothing else was selected."}</div>`:""}
     ${needLc&&!locked?`<div class="warn"><b>${needLc} selected ${needLc===1?"card has":"cards have"} no last comp yet.</b> Enter one in the panel (or on the tile) — admin needs it on the first pass.</div>`:""}
-    ${S.kind&&!locked?`<div class="focusbar"><span>Showing only <b>${esc(S.kind)}</b> · ${S.rows.length} ${S.rows.length===1?"copy":"copies"}</span><button class="btn" type="button" id="kindAll">Show all ${S.matched.length} cards</button></div>`:""}
-    ${!S.kind&&!locked&&S.scope!=="tasks"&&(()=>{ const all=[...new Set(S.rows.map(cardKey))]; if(all.length<2) return "";
-      const cnt=k=>S.rows.filter(r=>cardKey(r)===k).length, selN=k=>sel.filter(r=>cardKey(r)===k).length;
-      const order=all.sort((a,b)=>cnt(b)-cnt(a));
-      return `<div class="warn"><b>${all.length} different versions of this card matched.</b> Click one to work on only those copies — or keep them all and they all get the panel value (type on a tile for a different one).
-        <ul class="taglist kinds">${order.map(k=>`<li><button type="button" class="kindpick" data-kind="${esc(k)}"><span>${esc(k)}</span><span>${selN(k)===cnt(k)?cnt(k):`${selN(k)} of ${cnt(k)}`}</span></button></li>`).join("")}</ul></div>`; })()||""}
+    ${!locked&&S.scope!=="tasks"&&(()=>{
+      // every version of the card in this search (range tab applied), whether or not one is picked
+      const base=(S.scope==="tasks"?S.matched:needsChange(S.matched,S.target)).filter(r=>BAND==="all"||inBand(r,BAND));
+      const cnt=new Map(); base.forEach(r=>{const k=cardKey(r); cnt.set(k,(cnt.get(k)||0)+1);});
+      if(cnt.size<2&&!S.kind) return "";
+      const order=[...cnt.keys()].sort((a,b)=>cnt.get(b)-cnt.get(a));
+      const selN=k=>sel.filter(r=>cardKey(r)===k).length;
+      const open=!S.kind||S.kindOpen;
+      return `<div class="warn versions">
+        ${S.kind
+          ?`<div class="focusbar"><button class="btn" type="button" id="kindAll">← Back to all ${cnt.size} versions</button><span>Showing only <b>${esc(S.kind)}</b> · ${S.rows.length} ${S.rows.length===1?"copy":"copies"}</span><button class="btn link" type="button" id="kindToggle">${open?"Hide list":"Pick another version"}</button></div>`
+          :`<b>${cnt.size} different versions of this card matched.</b> Click one to work on only those copies — or keep them all and they all get the panel value (type on a tile for a different one).`}
+        ${open?`<ul class="taglist kinds">${S.kind?`<li><button type="button" class="kindpick" data-kind=""><span>← All versions</span><span>${base.length}</span></button></li>`:""}${order.map(k=>`<li><button type="button" class="kindpick ${k===S.kind?"on":""}" data-kind="${esc(k)}" aria-pressed="${k===S.kind}"><span>${esc(k)}</span><span>${!S.kind&&selN(k)!==cnt.get(k)?`${selN(k)} of ${cnt.get(k)}`:cnt.get(k)}</span></button></li>`).join("")}</ul>`:""}
+      </div>`; })()||""}
     ${big.length&&!locked?`<div class="warn"><b>${big.length} ${big.length===1?"card moves":"cards move"} more than ${window.BIG_PCT||50}%</b> (or had no value). They're marked on the tiles. Double-check them before submitting.</div>`:""}
   </div>`;
   const showRows=(S.phase==="done"&&!S.showAll)?S.done:S.rows;
-  const LIMIT=S.limit||240;
-  $("#grid").innerHTML=S.rows.length?`<div class="grid">${showRows.slice(0,LIMIT).map(tile).join("")}</div>${showRows.length>LIMIT?`<div class="more"><span class="dim small">Showing ${LIMIT} of ${showRows.length.toLocaleString()} cards. </span><button class="btn link" type="button" id="moreBtn">Show ${Math.min(240,showRows.length-LIMIT)} more</button></div>`:""}`:"";
-  const mb=$("#moreBtn"); if(mb) mb.onclick=()=>{S.limit=LIMIT+240;render()};
+  const pages=Math.max(1,Math.ceil(showRows.length/PAGE)); if(S.page>=pages) S.page=pages-1; if(S.page<0) S.page=0;
+  const pageRows=showRows.slice(S.page*PAGE,(S.page+1)*PAGE);
+  const pager=pages>1?`<div class="pager"><button class="btn" type="button" data-pg="${S.page-1}" ${S.page===0?"disabled":""}>‹ Prev</button>
+    <span class="small">Page <b>${S.page+1}</b> of ${pages} · cards ${(S.page*PAGE+1).toLocaleString()}–${Math.min((S.page+1)*PAGE,showRows.length).toLocaleString()} of ${showRows.length.toLocaleString()}</span>
+    <button class="btn" type="button" data-pg="${S.page+1}" ${S.page>=pages-1?"disabled":""}>Next ›</button></div>`:"";
+  $("#grid").innerHTML=S.rows.length?`${pager}<div class="grid">${pageRows.map(tile).join("")}</div>${pager}`:"";
+  document.querySelectorAll(".pager [data-pg]").forEach(b=>b.onclick=()=>{S.page=+b.dataset.pg; render(); $("#grid").scrollIntoView({behavior:"smooth",block:"start"});});
   if(S.phase==="done") $("#summary").innerHTML=resultHeader();
   const sa=$("#showAll"); if(sa) sa.onclick=()=>{S.showAll=!S.showAll;render()};
-  S._n=sel.length; S._big=big.length; bindSummary(); bindTiles(); renderBar(sel.length,big.length); scheduleCopies();
+  S._n=sel.length; S._big=big.length; renderBands(); bindSummary(); bindTiles(); renderBar(sel.length,big.length); scheduleCopies();
   if(S.phase==="review"){ clearTimeout(liveT2); liveT2=setTimeout(fetchLive,150); }
 }
 function resultHeader(){
@@ -637,6 +670,7 @@ async function copyText(el){
   el.textContent=ok?"✓":"!"; el.classList.add("done"); setTimeout(()=>{el.textContent="⧉"; el.classList.remove("done")},1200);
 }
 const copyTarget=e=>(e.target.closest&&e.target.closest("[data-copy]"))||((document.elementFromPoint(e.clientX,e.clientY)||{}).closest?.("[data-copy]"))||null;
+document.addEventListener("keydown",e=>{ if(e.key==="Escape"&&S&&S.kind&&S.phase==="review"&&!document.querySelector("dialog[open]")){ S.kind=null; S.kindOpen=false; S.page=0; recompute(true); } });
 document.addEventListener("click",e=>{const c=copyTarget(e); if(!c) return; e.preventDefault(); e.stopPropagation(); copyText(c);},true);
 document.addEventListener("mousedown",e=>{ if(copyTarget(e)) e.preventDefault(); },true); /* keep the tile from taking focus */
 document.addEventListener("keydown",e=>{const c=e.target.closest&&e.target.closest(".copyb"); if(!c||(e.key!=="Enter"&&e.key!==" ")) return; e.preventDefault(); e.stopPropagation(); copyText(c);},true);
@@ -649,7 +683,7 @@ const daysAgo=iso=>{const d=new Date(iso); if(isNaN(d)) return null; const a=new
 let liveT2, liveBusy=false;
 async function fetchLive(){
   if(!S||liveBusy) return; S.live=S.live||new Map();
-  const ids=S.rows.slice(0,S.limit||240).map(r=>r.item_id).filter(id=>!S.live.has(id)).slice(0,100);
+  const ids=S.rows.slice((S.page||0)*PAGE,((S.page||0)+1)*PAGE).map(r=>r.item_id).filter(id=>!S.live.has(id)).slice(0,100);
   if(!ids.length) return;
   liveBusy=true; const mine=S;
   try{ const res=await api("ev-live",{item_ids:ids}); if(mine!==S) return;
@@ -775,12 +809,34 @@ function renderBar(n,big){
       `<b>${n}</b> ${n===1?"card":"cards"}${S.scope==="tasks"&&S.withCopies&&selRows.some(r=>copiesOf(r.item_id).length)?` + <b>${selRows.reduce((a,r)=>a+copiesOf(r.item_id).length,0)}</b> copies`:""} will be submitted${S.over.size||S.target==null?"":` at <b>${money2(S.target)}</b>`}${big?` · <span style="color:var(--warn)">${big} big ${big===1?"change":"changes"}</span>`:""}`;
   }
 }
+/* EV range tabs (always under the search box). With no search typed, a tab shows every warehouse card in that range. */
+function renderBands(){
+  const bar=$("#bandbar"); if(!bar) return;
+  const has=S&&S.phase==="review";
+  const custom=has&&S.evRange&&S.evRange.typed&&!bandFor(S.evRange.min,S.evRange.max);
+  bar.innerHTML=`<span class="dim small">EV range</span>${BANDS.map(b=>{
+    // search already limited to one range: only that tab's count is known (the others load when clicked)
+    const limited=has&&S.serverBand&&!(S.evRange&&S.evRange.typed);
+    const n=!has||(limited&&b.id!==BAND)?null:(b.id==="all"?S.matched.length:S.matched.filter(r=>inBand(r,b.id)).length);
+    return `<button type="button" class="band" data-band="${b.id}" aria-pressed="${BAND===b.id&&!custom}">${b.label}${n!=null?` <span class="cnt">${n.toLocaleString()}${b.id==="all"&&S.total>S.matched.length?"+":""}</span>`:""}</button>`;}).join("")}
+    ${custom?`<span class="band on">Typed: ${S.evRange.min!=null?money(S.evRange.min):"$0"}${S.evRange.max!=null?"–"+money(S.evRange.max):"+"}</span>`:""}
+    ${!has?`<span class="dim small">Pick a range to see every warehouse card in it, or type a search first.</span>`:""}`;
+  bar.querySelectorAll(".band[data-band]").forEach(b=>b.onclick=()=>{
+    BAND=b.dataset.band;
+    const text=$("#input").value.trim();
+    // nothing on screen yet, results cut off, or the last search was limited to a range: fetch fresh
+    if(!S||S.phase!=="review"||S.total>S.matched.length||(S.serverBand&&!(S.evRange&&S.evRange.typed))||(!S.matched.length)){ if(text||BAND!=="all") find(text); else { renderBands(); } return; }
+    S.page=0; recompute(true);
+  });
+}
 function bindSummary(){
   const ei=$("#evIn"); if(ei){
     ei.oninput=()=>{const pos=ei.selectionStart;const v=ei.value.replace(/[$,\s]/g,"");S.target=v===""?null:Number(v);if(!Number.isFinite(S.target))S.target=null;recompute(true);const x=$("#evIn");x.focus();x.setSelectionRange(pos,pos)};
   }
-  document.querySelectorAll(".kindpick").forEach(b=>b.onclick=()=>{ S.kind=b.dataset.kind; recompute(true); scrollTo({top:0,behavior:"smooth"}); });
-  const ka=$("#kindAll"); if(ka) ka.onclick=()=>{ S.kind=null; recompute(true); };
+
+  document.querySelectorAll(".kindpick").forEach(b=>b.onclick=()=>{ S.kind=b.dataset.kind||null; S.kindOpen=false; S.page=0; recompute(true); });
+  const ka=$("#kindAll"); if(ka) ka.onclick=()=>{ S.kind=null; S.kindOpen=false; S.page=0; recompute(true); };
+  const kt=$("#kindToggle"); if(kt) kt.onclick=()=>{ S.kindOpen=!S.kindOpen; render(); };
   const cp=$("#cpIn"); if(cp) cp.onchange=()=>{S.withCopies=cp.checked; S.copiesKey=""; render();};
   const ni=$("#noteIn"); if(ni) ni.oninput=()=>{S.note=ni.value;ni.classList.toggle("need",!ni.value.trim());renderBar(S._n,S._big)};
   const li=$("#lcIn"); if(li) li.oninput=()=>{S.lastComp=li.value.replace(/[$,\s]/g,"");renderBar(S._n,S._big)};
@@ -894,7 +950,7 @@ async function undo(){
 
 /* ---------- new request ---------- */
 const EMPTY_HELP={tasks:"Type a card to narrow the list (or leave it blank for all of them), plus the value: <b>yamato op16-098 psa 10 ev 25 lc 25 note mcp done</b>.",warehouse:"Type any card and the new value, e.g. <b>ohtani #US189 base psa 10 ev 300 lc 300 note mcp done</b> — or an AC / cert number. You'll see every matching card and its current value before anything changes; type on a tile to give one card its own value."};
-function newRequest(){S=null;$("#summary").innerHTML="";$("#grid").innerHTML="";$("#empty").hidden=false;$("#empty").innerHTML=EMPTY_HELP[SCOPE];$("#bar").hidden=true;$("#confirmBtn").hidden=false;$("#dryWrap").hidden=false;$("#input").value="";$("#input").focus();scrollTo({top:0}); if(SCOPE==="tasks") find("");}
+function newRequest(){S=null;setTimeout(renderBands,0);$("#summary").innerHTML="";$("#grid").innerHTML="";$("#empty").hidden=false;$("#empty").innerHTML=EMPTY_HELP[SCOPE];$("#bar").hidden=true;$("#confirmBtn").hidden=false;$("#dryWrap").hidden=false;$("#input").value="";$("#input").focus();scrollTo({top:0}); if(SCOPE==="tasks") find("");}
 function setScope(sc){ SCOPE=sc; document.querySelectorAll(".seg.scope button").forEach(b=>b.setAttribute("aria-pressed",b.dataset.scope===sc));
   $("#input").placeholder=sc==="tasks"?"Type or use voice: yamato op16-098 psa 10 ev 25 lc 25 note mcp done":"Type or use voice: ohtani #US189 base psa 10 ev 300 lc 300 note mcp done";
   $("#srcCount").textContent=""; const v=$("#input").value.trim(); S=null; $("#summary").innerHTML="";$("#grid").innerHTML="";$("#bar").hidden=true;
@@ -973,7 +1029,7 @@ $("#savedList").addEventListener("click",async e=>{
   }
 });
 
-$("#form").onsubmit=e=>{e.preventDefault();clearTimeout(liveT);const v=$("#input").value.trim();if(v||SCOPE==="tasks")find(v)};
+$("#form").onsubmit=e=>{e.preventDefault();clearTimeout(liveT);const v=$("#input").value.trim();if(v||SCOPE==="tasks"||BAND!=="all")find(v)};
 
 /* request box grows with long prompts; Enter runs it, Shift+Enter adds a line */
 const grow=()=>{const i=$("#input");i.style.height="auto";i.style.height=Math.min(i.scrollHeight+2,200)+"px"};
@@ -1245,6 +1301,7 @@ async function boot(){
   loadSaved(); renderHistory();
   showTab("request"); refreshCounts();
   if(!S) setScope("warehouse");
+  renderBands();
 }
 if(INVITE) showLogin(); else boot();
 </script>

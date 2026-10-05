@@ -10,6 +10,7 @@ import { readTarget } from "@/lib/target";
 import { parsePasted, searchPasted } from "@/lib/paste";
 import { readTags, hasTag } from "@/lib/tagfilter";
 import { titleSearch, looksLikeTcg } from "@/lib/title";
+import { readEvRange } from "@/lib/evrange";
 import { queryCards } from "@/lib/metabase";
 import { probeEv, openAdminSession, liveEv, type LiveEv } from "@/lib/admin";
 import {
@@ -123,7 +124,16 @@ export async function POST(req: Request, ctx: Ctx) {
   try {
     switch (action) {
       case "find": {
-        const { target, rest } = readTarget(str("text"));
+        // EV range: typed ("5000 or more ev", "$5k+", "under $100") and/or the range tab picked on screen
+        const rng = readEvRange(str("text"));
+        const num = (v: unknown) => (v === null || v === undefined || v === "" || !Number.isFinite(Number(v)) ? null : Number(v));
+        // a range typed in the request wins; otherwise the range tab picked on screen
+        const typed = rng.min != null || rng.max != null;
+        const mins = [typed ? rng.min : num(body.min_ev)].filter((x): x is number => x != null);
+        const maxs = [typed ? rng.max : num(body.max_ev)].filter((x): x is number => x != null);
+        const evMin = mins.length ? Math.max(...mins) : null, evMax = maxs.length ? Math.min(...maxs) : null;
+        const rangeF = { ...(evMin != null ? { min_estimated_value: evMin } : {}), ...(evMax != null ? { max_estimated_value: evMax } : {}) };
+        const { target, rest } = readTarget(rng.rest);
         if (body.scope === "tasks") {
           // cards waiting for an estimate, narrowed by whatever was typed (blank = all of them)
           const t0 = Date.now();
@@ -148,8 +158,13 @@ export async function POST(req: Request, ctx: Ctx) {
         const tg = pasted ? { tags: [], untagged: false, rest } : readTags(rest);
         // tag only ("tag sd_wemby_grail"): pull the cards with that tag straight from 4131
         const tagOnly = !pasted && (tg.tags.length > 0) && !tg.rest;
-        const r0 = tagOnly
-          ? await (async () => { const t0 = Date.now(); const rows = (await Promise.all(tg.tags.map((t) => queryCards({ tag: t })))).flat();
+        // a range on its own (a tab picked, nothing typed): every warehouse card in that range
+        const rangeOnly = !pasted && !tg.tags.length && !tg.untagged && !tg.rest.trim() && Object.keys(rangeF).length > 0;
+        const r0 = rangeOnly
+          ? await (async () => { const t0 = Date.now(); const rows = await queryCards(rangeF);
+              return { parsed: { filters: {}, post_filters: {} }, has_filter: true, queries: [rangeF], ms: Date.now() - t0, rows, missing: [] as string[] }; })()
+          : tagOnly
+          ? await (async () => { const t0 = Date.now(); const rows = (await Promise.all(tg.tags.map((t) => queryCards({ tag: t, ...rangeF })))).flat();
               return { parsed: { filters: {}, post_filters: {} }, has_filter: true, queries: tg.tags.map((t) => ({ tag: t })), ms: Date.now() - t0, rows: [...new Map(rows.map((x) => [x.item_id, x])).values()], missing: [] as string[] }; })()
           : pasted
           ? await (async () => { const t0 = Date.now(); const p = await searchPasted(pasted);
@@ -158,18 +173,22 @@ export async function POST(req: Request, ctx: Ctx) {
               // Pokémon / One Piece titles: title search first; anything else: the Tag Bot search, with title search as the fallback
               const asTitle = async () => { const x = await titleSearch(tg.rest); return x && x.rows.length ? { parsed: { filters: x.display, post_filters: {} }, has_filter: true, queries: x.queries, ms: x.ms, rows: x.rows, missing: x.missing } : null; };
               if (looksLikeTcg(tg.rest)) { const x = await asTitle(); if (x) return x; }
-              const r1 = await smartSearch(tg.rest).catch(() => null);
+              const r1 = await smartSearch(tg.rest, rangeF).catch(() => null);
               if (r1 && r1.rows.length) return r1;
-              return (await asTitle()) ?? r1 ?? (await smartSearch(tg.rest));
+              return (await asTitle()) ?? r1 ?? (await smartSearch(tg.rest, rangeF));
             })();
         // tag filter on top of whatever else was typed
-        const tagRows = r0.rows.filter((x) => hasTag(x.tag, tg.tags) && (!tg.untagged || !x.tag));
+        const tagRows = r0.rows.filter((x) => hasTag(x.tag, tg.tags) && (!tg.untagged || !x.tag)
+          && (evMin == null || (x.estimated_value ?? 0) >= evMin) && (evMax == null || (x.estimated_value ?? 0) <= evMax)
+          // a year on its own ("2020 basketball") holds results to sets from that year
+          && (!rng.year || pasted != null || String(x.set_name ?? "").includes(rng.year)));
         const r = { ...r0, rows: tagRows, queries: r0.queries,
-          parsed: { ...r0.parsed, filters: { ...(r0.parsed?.filters ?? {}), ...(tg.tags.length ? { tag: tg.tags.join(" or ") } : {}), ...(tg.untagged ? { tag: "none (untagged)" } : {}) } },
+          parsed: { ...r0.parsed, filters: { ...(r0.parsed?.filters ?? {}), ...rangeF, ...(rng.year && !pasted ? { year: rng.year } : {}), ...(tg.tags.length ? { tag: tg.tags.join(" or ") } : {}), ...(tg.untagged ? { tag: "none (untagged)" } : {}) } },
           has_filter: r0.has_filter || tg.tags.length > 0 || tg.untagged };
-        const LIMIT = 3000;
+        const LIMIT = 6000; // the screen pages through these 200 at a time
         return json({
           target_ev: target,
+          ev_range: { min: evMin, max: evMax, typed },
           parsed: r.parsed,
           has_filter: r.has_filter,
           queries: r.queries,
