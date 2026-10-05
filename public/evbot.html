@@ -194,6 +194,8 @@ dialog.info{max-width:760px;width:calc(100% - 32px);padding:0}
 .taglist.kinds li{padding:0;border:0}
 .kindpick{all:unset;box-sizing:border-box;display:flex;justify-content:space-between;gap:12px;width:100%;padding:7px 8px;border-bottom:1px dashed var(--line);cursor:pointer;border-radius:6px}
 .kindpick:hover,.kindpick:focus-visible{background:color-mix(in srgb,var(--go) 12%,transparent);color:var(--go);outline:none}
+.kindpick.did{opacity:.75}
+.didb{display:inline-block;margin-right:8px;padding:0 6px;border:1px solid var(--go);border-radius:5px;color:var(--go);font-size:11px;font-weight:700}
 .kindpick.on{background:color-mix(in srgb,var(--go) 18%,transparent);color:var(--go);font-weight:700}
 .versions .focusbar{margin-top:0}
 .focusbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;margin-top:10px;padding:8px 12px;border:1px solid var(--go);border-radius:10px;background:color-mix(in srgb,var(--go) 8%,transparent)}
@@ -327,6 +329,7 @@ dialog .acts{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}
   <div class="in">
     <div class="msg" id="barmsg"></div>
     <label class="tog" id="dryWrap"><input type="checkbox" id="dry"> Dry run</label>
+    <button class="btn" id="backBtn" type="button" hidden>← Back to all versions</button>
     <button class="btn" id="newBtn" type="button">New request</button>
     <button class="btn primary big" id="confirmBtn" type="button">Confirm values</button>
   </div>
@@ -517,6 +520,8 @@ let BAND="all";
 const inBand=(r,b)=>{const B=BANDS.find(x=>x.id===b)||BANDS[0]; const v=r.ev||0; return (B.min==null||v>=B.min)&&(B.max==null||v<=B.max);};
 const bandFor=(min,max)=>{const b=BANDS.find(x=>x.id!=="all"&&(x.min??null)===(min??null)&&((x.max==null&&max==null)||(x.max!=null&&max!=null&&Math.floor(x.max)===Math.floor(max)))); return b?b.id:null;};
 const PAGE=200;
+/* card versions submitted this session — marked in the versions list when you come back to it */
+const DONE=new Map();
 async function find(text){
   requestAnimationFrame(()=>{const i=$("#input");i.style.height="auto";i.style.height=Math.min(i.scrollHeight+2,200)+"px"});
   if(!text.trim()&&SCOPE!=="tasks"&&BAND==="all") return;
@@ -629,8 +634,8 @@ function render(){
       return `<div class="warn versions">
         ${S.kind
           ?`<div class="focusbar"><button class="btn" type="button" id="kindAll">← Back to all ${cnt.size} versions</button><span>Showing only <b>${esc(S.kind)}</b> · ${S.rows.length} ${S.rows.length===1?"copy":"copies"}</span><button class="btn link" type="button" id="kindToggle">${open?"Hide list":"Pick another version"}</button></div>`
-          :`<b>${cnt.size} different versions of this card matched.</b> Click one to work on only those copies — or keep them all and they all get the panel value (type on a tile for a different one).`}
-        ${open?`<ul class="taglist kinds">${S.kind?`<li><button type="button" class="kindpick" data-kind=""><span>← All versions</span><span>${base.length}</span></button></li>`:""}${order.map(k=>`<li><button type="button" class="kindpick ${k===S.kind?"on":""}" data-kind="${esc(k)}" aria-pressed="${k===S.kind}"><span>${esc(k)}</span><span>${!S.kind&&selN(k)!==cnt.get(k)?`${selN(k)} of ${cnt.get(k)}`:cnt.get(k)}</span></button></li>`).join("")}</ul>`:""}
+          :`<b>${cnt.size} different versions of this card matched.</b>${[...cnt.keys()].filter(k=>DONE.has(k)).length?` <span class="didb">✓ ${[...cnt.keys()].filter(k=>DONE.has(k)).length} submitted this session</span>`:""} Click one to work on only those copies — or keep them all and they all get the panel value (type on a tile for a different one).`}
+        ${open?`<ul class="taglist kinds">${S.kind?`<li><button type="button" class="kindpick" data-kind=""><span>← All versions</span><span>${base.length}</span></button></li>`:""}${order.map(k=>`<li><button type="button" class="kindpick ${k===S.kind?"on":""} ${DONE.has(k)?"did":""}" data-kind="${esc(k)}" aria-pressed="${k===S.kind}"><span>${DONE.has(k)?`<span class="didb">✓ submitted ${[...DONE.get(k).vals].map(v=>money2(v)).join(", ")}</span> `:""}${esc(k)}</span><span>${!S.kind&&selN(k)!==cnt.get(k)?`${selN(k)} of ${cnt.get(k)}`:cnt.get(k)}</span></button></li>`).join("")}</ul>`:""}
       </div>`; })()||""}
     ${big.length&&!locked?`<div class="warn"><b>${big.length} ${big.length===1?"card moves":"cards move"} more than ${window.BIG_PCT||50}%</b> (or had no value). They're marked on the tiles. Double-check them before submitting.</div>`:""}
   </div>`;
@@ -644,6 +649,7 @@ function render(){
   document.querySelectorAll(".pager [data-pg]").forEach(b=>b.onclick=()=>{S.page=+b.dataset.pg; render(); $("#grid").scrollIntoView({behavior:"smooth",block:"start"});});
   if(S.phase==="done") $("#summary").innerHTML=resultHeader();
   const sa=$("#showAll"); if(sa) sa.onclick=()=>{S.showAll=!S.showAll;render()};
+  const bt=$("#backTop"); if(bt) bt.onclick=backToVersions;
   S._n=sel.length; S._big=big.length; renderBands(); bindSummary(); bindTiles(); renderBar(sel.length,big.length); scheduleCopies();
   if(S.phase==="review"){ clearTimeout(liveT2); liveT2=setTimeout(fetchLive,150); }
 }
@@ -656,7 +662,7 @@ function resultHeader(){
   else { head=`✓ ${n} cards submitted${at}`; sub="They're waiting in the Approve tab. The value goes live when approved."; }
   return `<div class="summary result">
     <div><div class="rh">${head}</div><div class="dim small">${sub}</div></div>
-    <div class="totals">${others>0?`<button class="btn link" type="button" id="showAll">${S.showAll?"Show only changed cards":`Also show ${others} not included`}</button>`:""}</div>
+    <div class="totals"><button class="btn" type="button" id="backTop">← Back to all versions</button>${others>0?`<button class="btn link" type="button" id="showAll">${S.showAll?"Show only changed cards":`Also show ${others} not included`}</button>`:""}</div>
   </div>`;
 }
 /* copy buttons (cert, AC): copy without selecting/deselecting the tile */
@@ -917,7 +923,9 @@ async function run(sel,dry){
   const unapproved=new Set((res.failures||[]).filter(f=>f.step==="approve").map(f=>f.item_id));
   const prev=res.previous||{};
   sel.forEach(r=>{ if(written.has(r.item_id)) S.prev.set(r.item_id,prev[r.item_id]!=null?prev[r.item_id]:r.ev); });
+  $("#backBtn").hidden=false;
   S.failed=new Map((res.failures||[]).map(f=>[f.item_id,f.error||("HTTP "+f.status)]));
+  if(!isDry){ const t=new Date(); sel.filter(r=>written.has(r.item_id)).forEach(r=>{ const k=cardKey(r), d=DONE.get(k)||{n:0,vals:new Set(),at:t}; d.n++; d.vals.add(evOf(r)); d.at=t; DONE.set(k,d); }); }
   S.phase="done"; S.runId=res.run_id; S.dry=isDry; S.doneTarget=oneVal?evOf(sel[0]):null; S.done=sel.filter(r=>written.has(r.item_id)); render();
   renderHistory();
   const failNote=(res.failed||res.mismatch)?` <span style="color:var(--warn)">${(res.failed||0)+(res.mismatch||0)} failed — shown on the tiles (click "Also show … not included").</span>`:"";
@@ -950,13 +958,16 @@ async function undo(){
 
 /* ---------- new request ---------- */
 const EMPTY_HELP={tasks:"Type a card to narrow the list (or leave it blank for all of them), plus the value: <b>yamato op16-098 psa 10 ev 25 lc 25 note mcp done</b>.",warehouse:"Type any card and the new value, e.g. <b>ohtani #US189 base psa 10 ev 300 lc 300 note mcp done</b> — or an AC / cert number. You'll see every matching card and its current value before anything changes; type on a tile to give one card its own value."};
-function newRequest(){S=null;setTimeout(renderBands,0);$("#summary").innerHTML="";$("#grid").innerHTML="";$("#empty").hidden=false;$("#empty").innerHTML=EMPTY_HELP[SCOPE];$("#bar").hidden=true;$("#confirmBtn").hidden=false;$("#dryWrap").hidden=false;$("#input").value="";$("#input").focus();scrollTo({top:0}); if(SCOPE==="tasks") find("");}
+function newRequest(){$("#backBtn").hidden=true;S=null;setTimeout(renderBands,0);$("#summary").innerHTML="";$("#grid").innerHTML="";$("#empty").hidden=false;$("#empty").innerHTML=EMPTY_HELP[SCOPE];$("#bar").hidden=true;$("#confirmBtn").hidden=false;$("#dryWrap").hidden=false;$("#input").value="";$("#input").focus();scrollTo({top:0}); if(SCOPE==="tasks") find("");}
 function setScope(sc){ SCOPE=sc; document.querySelectorAll(".seg.scope button").forEach(b=>b.setAttribute("aria-pressed",b.dataset.scope===sc));
   $("#input").placeholder=sc==="tasks"?"Type or use voice: yamato op16-098 psa 10 ev 25 lc 25 note mcp done":"Type or use voice: ohtani #US189 base psa 10 ev 300 lc 300 note mcp done";
   $("#srcCount").textContent=""; const v=$("#input").value.trim(); S=null; $("#summary").innerHTML="";$("#grid").innerHTML="";$("#bar").hidden=true;
   if(sc==="tasks"||v) find(v); else { $("#empty").hidden=false; $("#empty").innerHTML=EMPTY_HELP[sc]; } }
 document.querySelectorAll(".seg.scope button").forEach(b=>b.onclick=()=>setScope(b.dataset.scope));
 $("#newBtn").onclick=newRequest;
+/* after a submit: run the same search again (fresh values + live admin dates) and land on the full versions list */
+function backToVersions(){ if(!S) return; const t=S.lastText||$("#input").value.trim(); S=null; $("#backBtn").hidden=true; $("#input").value=t; find(t); scrollTo({top:0,behavior:"smooth"}); }
+$("#backBtn").onclick=backToVersions;
 
 /* ---------- tabs ---------- */
 function showTab(name){
