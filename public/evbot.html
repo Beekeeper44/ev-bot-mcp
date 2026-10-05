@@ -966,7 +966,21 @@ function setScope(sc){ SCOPE=sc; document.querySelectorAll(".seg.scope button").
 document.querySelectorAll(".seg.scope button").forEach(b=>b.onclick=()=>setScope(b.dataset.scope));
 $("#newBtn").onclick=newRequest;
 /* after a submit: run the same search again (fresh values + live admin dates) and land on the full versions list */
-function backToVersions(){ if(!S) return; const t=S.lastText||$("#input").value.trim(); S=null; $("#backBtn").hidden=true; $("#input").value=t; find(t); scrollTo({top:0,behavior:"smooth"}); }
+/* after a submit: back to the same results and the orange versions list — no new search.
+   Cards just submitted show "Waiting: $X done"; ones approved since then show the new live value. */
+function backToVersions(){
+  if(!S) return;
+  S.live=S.live||new Map(); const now=new Date().toISOString();
+  for(const r of (S.done||[])){
+    if(S.dry) break;
+    const prev=S.live.get(r.item_id), v=(S.doneVals&&S.doneVals.get(r.item_id))??S.doneTarget;
+    if(prev&&prev.fresh) continue; // already approved from the Approve tab
+    S.live.set(r.item_id,{live:prev?prev.live:null,waiting:{ev:v,last_comp:null,at:now,status:"done"}});
+  }
+  Object.assign(S,{phase:"review",kind:null,kindOpen:false,showAll:false,page:0,target:null,over:new Map(),lastComp:"",url:"",note:window.DEFAULT_NOTE||"mcp done",failed:null,done:[],dry:false});
+  $("#backBtn").hidden=true; $("#confirmBtn").hidden=false; $("#dryWrap").hidden=false;
+  recompute(true); scrollTo({top:0,behavior:"smooth"});
+}
 $("#backBtn").onclick=backToVersions;
 
 /* ---------- tabs ---------- */
@@ -1157,6 +1171,12 @@ async function doApprove(ids,all){
   }
   catch(e){ if(got.length){ res=mergeRes(got); res.failed=(res.failed||0)+(rows.length-(res.approved||0)-(res.failed||0)); } else { $("#amsg").innerHTML=`<span style="color:var(--warn)">${esc(e.message)}</span>`; renderAbar(); return; } }
   if(res.status==="dry_run_completed"){ $("#amsg").innerHTML=`<b>Dry run done.</b> ${res.would_approve} would be approved.`; renderAbar(); return; }
+  if(S&&S.matched&&res.approved_ids&&res.approved_ids.length){
+    S.live=S.live||new Map(); const now=new Date(Date.now()+1000).toISOString(), byId=new Map(rows.map(r=>[r.item_id,r]));
+    for(const id of res.approved_ids){ const q=byId.get(id), c=S.matched.find(x=>x.item_id===id); if(!q||!c) continue;
+      c.ev=Number(q.new_ev); if(q.last_comp!=null) c.last_comp=Number(q.last_comp);
+      S.live.set(id,{live:{ev:Number(q.new_ev),last_comp:q.last_comp!=null?Number(q.last_comp):null,at:now,status:"approved",note:note},waiting:null,fresh:true}); }
+  }
   A.done={head:`✓ ${res.approved} approved — values are live`,sub:`${res.failed?`${res.failed} failed and are still in the queue (hover for why). `:""}Run ${res.run_id}. Undo it from Recent runs if needed.`};
   A.touched=false; renderHistory(); loadApprovals();
 }
