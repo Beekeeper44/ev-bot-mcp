@@ -520,8 +520,16 @@ let BAND="all";
 const inBand=(r,b)=>{const B=BANDS.find(x=>x.id===b)||BANDS[0]; const v=r.ev||0; return (B.min==null||v>=B.min)&&(B.max==null||v<=B.max);};
 const bandFor=(min,max)=>{const b=BANDS.find(x=>x.id!=="all"&&(x.min??null)===(min??null)&&((x.max==null&&max==null)||(x.max!=null&&max!=null&&Math.floor(x.max)===Math.floor(max)))); return b?b.id:null;};
 const PAGE=200;
-/* card versions submitted this session — marked in the versions list when you come back to it */
-const DONE=new Map();
+/* versions submitted through ev-bot in the last 7 days (by anyone) — marked in the versions list, then they drop off */
+const RECENT_DAYS=7;
+function recentOf(rows,k){
+  const cut=Date.now()-RECENT_DAYS*864e5;
+  const hits=rows.filter(r=>cardKey(r)===k&&r.recent&&new Date(r.recent.at).getTime()>cut);
+  if(!hits.length) return null;
+  const at=hits.map(r=>r.recent.at).sort().pop();
+  return { vals:[...new Set(hits.map(r=>r.recent.ev))], at, n:hits.length, approved:hits.every(r=>r.recent.status==="approved"), by:[...new Set(hits.map(r=>r.recent.by).filter(Boolean))] };
+}
+const recentBadge=d=>`<span class="didb" title="${d.n} ${d.n===1?"card":"cards"}${d.by.length?" · by "+esc(d.by.join(", ")):""} · shows for ${RECENT_DAYS} days">✓ ${d.approved?"approved":"submitted"} ${d.vals.slice(0,3).map(v=>money2(v)).join(", ")} · ${dayOf(d.at)}</span>`;
 async function find(text){
   requestAnimationFrame(()=>{const i=$("#input");i.style.height="auto";i.style.height=Math.min(i.scrollHeight+2,200)+"px"});
   if(!text.trim()&&SCOPE!=="tasks"&&BAND==="all") return;
@@ -634,8 +642,8 @@ function render(){
       return `<div class="warn versions">
         ${S.kind
           ?`<div class="focusbar"><button class="btn" type="button" id="kindAll">← Back to all ${cnt.size} versions</button><span>Showing only <b>${esc(S.kind)}</b> · ${S.rows.length} ${S.rows.length===1?"copy":"copies"}</span><button class="btn link" type="button" id="kindToggle">${open?"Hide list":"Pick another version"}</button></div>`
-          :`<b>${cnt.size} different versions of this card matched.</b>${[...cnt.keys()].filter(k=>DONE.has(k)).length?` <span class="didb">✓ ${[...cnt.keys()].filter(k=>DONE.has(k)).length} submitted this session</span>`:""} Click one to work on only those copies — or keep them all and they all get the panel value (type on a tile for a different one).`}
-        ${open?`<ul class="taglist kinds">${S.kind?`<li><button type="button" class="kindpick" data-kind=""><span>← All versions</span><span>${base.length}</span></button></li>`:""}${order.map(k=>`<li><button type="button" class="kindpick ${k===S.kind?"on":""} ${DONE.has(k)?"did":""}" data-kind="${esc(k)}" aria-pressed="${k===S.kind}"><span>${DONE.has(k)?`<span class="didb">✓ submitted ${[...DONE.get(k).vals].map(v=>money2(v)).join(", ")}</span> `:""}${esc(k)}</span><span>${!S.kind&&selN(k)!==cnt.get(k)?`${selN(k)} of ${cnt.get(k)}`:cnt.get(k)}</span></button></li>`).join("")}</ul>`:""}
+          :`<b>${cnt.size} different versions of this card matched.</b>${(()=>{const n=[...cnt.keys()].filter(k=>recentOf(base,k)).length; return n?` <span class="didb">✓ ${n} done in the last ${RECENT_DAYS} days</span>`:"";})()} Click one to work on only those copies — or keep them all and they all get the panel value (type on a tile for a different one).`}
+        ${open?`<ul class="taglist kinds">${S.kind?`<li><button type="button" class="kindpick" data-kind=""><span>← All versions</span><span>${base.length}</span></button></li>`:""}${order.map(k=>`<li><button type="button" class="kindpick ${k===S.kind?"on":""} ${recentOf(base,k)?"did":""}" data-kind="${esc(k)}" aria-pressed="${k===S.kind}"><span>${recentOf(base,k)?recentBadge(recentOf(base,k))+" ":""}${esc(k)}</span><span>${!S.kind&&selN(k)!==cnt.get(k)?`${selN(k)} of ${cnt.get(k)}`:cnt.get(k)}</span></button></li>`).join("")}</ul>`:""}
       </div>`; })()||""}
     ${big.length&&!locked?`<div class="warn"><b>${big.length} ${big.length===1?"card moves":"cards move"} more than ${window.BIG_PCT||50}%</b> (or had no value). They're marked on the tiles. Double-check them before submitting.</div>`:""}
   </div>`;
@@ -925,7 +933,7 @@ async function run(sel,dry){
   sel.forEach(r=>{ if(written.has(r.item_id)) S.prev.set(r.item_id,prev[r.item_id]!=null?prev[r.item_id]:r.ev); });
   $("#backBtn").hidden=false;
   S.failed=new Map((res.failures||[]).map(f=>[f.item_id,f.error||("HTTP "+f.status)]));
-  if(!isDry){ const t=new Date(); sel.filter(r=>written.has(r.item_id)).forEach(r=>{ const k=cardKey(r), d=DONE.get(k)||{n:0,vals:new Set(),at:t}; d.n++; d.vals.add(evOf(r)); d.at=t; DONE.set(k,d); }); }
+  if(!isDry){ const at=new Date().toISOString(); sel.filter(r=>written.has(r.item_id)).forEach(r=>{ r.recent={ev:evOf(r),at,by:ME&&ME.user,status:"submitted"}; }); }
   S.phase="done"; S.runId=res.run_id; S.dry=isDry; S.doneTarget=oneVal?evOf(sel[0]):null; S.done=sel.filter(r=>written.has(r.item_id)); render();
   renderHistory();
   const failNote=(res.failed||res.mismatch)?` <span style="color:var(--warn)">${(res.failed||0)+(res.mismatch||0)} failed — shown on the tiles (click "Also show … not included").</span>`:"";
@@ -1175,6 +1183,7 @@ async function doApprove(ids,all){
     S.live=S.live||new Map(); const now=new Date(Date.now()+1000).toISOString(), byId=new Map(rows.map(r=>[r.item_id,r]));
     for(const id of res.approved_ids){ const q=byId.get(id), c=S.matched.find(x=>x.item_id===id); if(!q||!c) continue;
       c.ev=Number(q.new_ev); if(q.last_comp!=null) c.last_comp=Number(q.last_comp);
+      c.recent={ev:Number(q.new_ev),at:(c.recent&&c.recent.at)||new Date().toISOString(),by:(c.recent&&c.recent.by)||null,status:"approved"};
       S.live.set(id,{live:{ev:Number(q.new_ev),last_comp:q.last_comp!=null?Number(q.last_comp):null,at:now,status:"approved",note:note},waiting:null,fresh:true}); }
   }
   A.done={head:`✓ ${res.approved} approved — values are live`,sub:`${res.failed?`${res.failed} failed and are still in the queue (hover for why). `:""}Run ${res.run_id}. Undo it from Recent runs if needed.`};

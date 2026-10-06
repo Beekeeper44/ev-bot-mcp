@@ -1,7 +1,7 @@
 // JSON API for the EV Bot screen. Everything except sign-in/setup/invites needs a signed-in account.
 import { config } from "@/lib/config";
 import { type CardFilters, type PostFilters } from "@/lib/metabase";
-import { runSelection, undoRun, listRuns, getRunItems, submitTasks, approvalQueue, approveQueued, withdrawQueued, type SubmitItem } from "@/lib/runs";
+import { runSelection, undoRun, listRuns, getRunItems, submitTasks, approvalQueue, approveQueued, withdrawQueued, recentSubmissions, type SubmitItem } from "@/lib/runs";
 import { listTasks, filterTasks } from "@/lib/tasks";
 import { findCopies } from "@/lib/copies";
 import { listPrompts, addPrompt, renamePrompt, deletePrompt } from "@/lib/ui";
@@ -186,6 +186,8 @@ export async function POST(req: Request, ctx: Ctx) {
           parsed: { ...r0.parsed, filters: { ...(r0.parsed?.filters ?? {}), ...rangeF, ...(rng.year && !pasted ? { year: rng.year } : {}), ...(tg.tags.length ? { tag: tg.tags.join(" or ") } : {}), ...(tg.untagged ? { tag: "none (untagged)" } : {}) } },
           has_filter: r0.has_filter || tg.tags.length > 0 || tg.untagged };
         const LIMIT = 6000; // the screen pages through these 200 at a time
+        // submitted through ev-bot in the last 7 days (any teammate) — marked in the versions list
+        const recent = await recentSubmissions(r.rows.slice(0, LIMIT).map((x) => x.item_id)).catch(() => new Map());
         return json({
           target_ev: target,
           ev_range: { min: evMin, max: evMax, typed },
@@ -205,6 +207,7 @@ export async function POST(req: Request, ctx: Ctx) {
             times_sold_back: r.times_sold_back, bin: r.storage_bin_id, slot: r.storage_bin_slot,
             purchase_cost: r.purchase_cost, purchase_location: r.purchase_location, po_number: r.po_number, set_number: r.set_number,
             last_comp: r.last_comp,
+            recent: recent.get(r.item_id) ?? null,
           })),
         });
       }

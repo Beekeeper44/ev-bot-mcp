@@ -513,3 +513,18 @@ export function summarizeEv(rows: CardRow[], target: number) {
   };
 }
 
+
+/** Latest submit per card in the last `days` days (shown in the versions list; gone after that). */
+export async function recentSubmissions(itemIds: string[], days = 7) {
+  if (!itemIds.length) return new Map<string, { ev: number; at: string; by: string | null; status: string }>();
+  const rows = await q<{ item_id: string; new_ev: string; submitted_at: string; submitted_by: string | null; status: string }>(
+    `SELECT DISTINCT ON (i.item_id) i.item_id, i.new_ev, i.submitted_at, i.submitted_by, i.status
+     FROM ev_run_items i
+     WHERE i.item_id = ANY($1::text[])
+       AND i.submitted_at > now() - ($2 || ' days')::interval
+       AND i.status IN ('submitted','approved','approve_failed','mismatch')
+     ORDER BY i.item_id, i.submitted_at DESC`,
+    [itemIds, String(days)]
+  );
+  return new Map(rows.map((r) => [r.item_id, { ev: Number(r.new_ev), at: r.submitted_at, by: r.submitted_by, status: r.status === "approved" ? "approved" : "submitted" }]));
+}
