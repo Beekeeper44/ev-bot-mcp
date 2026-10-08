@@ -9,7 +9,7 @@ import { createHmac, randomBytes, scryptSync, timingSafeEqual, createHash } from
 import supertokens from "supertokens-node";
 import { config } from "./config";
 import { q } from "./db";
-import { initSupertokens } from "./admin";
+import { initSupertokens, adminAccess } from "./admin";
 
 export type Role = "viewer" | "editor" | "approver" | "admin";
 export const ROLES: Role[] = ["viewer", "editor", "approver", "admin"];
@@ -22,6 +22,7 @@ export type User = {
   name: string;
   role: Role;
   admin_user_id: string | null;
+  admin_email?: string | null;
   active: boolean;
   has_password: boolean;
   has_mcp_key: boolean;
@@ -41,7 +42,7 @@ export function actorOf(u: User): Actor {
   return { ...u, session_user_id: config.sessionUserId(), attribution: "shared", note_suffix: ` · by ${u.name}` };
 }
 
-const COLS = `id, email, name, role, admin_user_id, active, (pw_hash IS NOT NULL) AS has_password,
+const COLS = `id, email, name, role, admin_user_id, admin_email, active, (pw_hash IS NOT NULL) AS has_password,
   (mcp_key_hash IS NOT NULL) AS has_mcp_key, created_by, created_at, last_login_at`;
 const norm = (e: string) => String(e || "").trim().toLowerCase();
 const sha = (v: string) => createHash("sha256").update(v).digest("hex");
@@ -160,6 +161,16 @@ export async function changePassword(userId: string, current: string, next: stri
 }
 
 // ---------- admin account link: find the person's admin user ID from their email ----------
+/** Every login with this email (admin and consumer accounts can share an email). */
+export async function lookupAdminUserIds(email: string): Promise<string[]> {
+  try {
+    initSupertokens();
+    const users = await supertokens.listUsersByAccountInfo(config.sessionTenantId(), { email: norm(email) });
+    return users.map((x) => x.id);
+  } catch {
+    return [];
+  }
+}
 export async function lookupAdminUserId(email: string): Promise<string | null> {
   try {
     initSupertokens();
@@ -180,7 +191,12 @@ export async function addUser(input: { email: string; name: string; role: Role; 
   if (!ROLES.includes(input.role)) throw new Error("Pick a role.");
   const [dupe] = await q(`SELECT id FROM ev_users WHERE email=$1`, [email]);
   if (dupe) throw new Error("That email already has an account.");
-  const adminId = input.admin_user_id?.trim() || (await lookupAdminUserId(email));
+  // the login admin actually accepts, when an email has several (e.g. a shopper account and an admin account)
+  const adminId = input.admin_user_id?.trim() || (await (async () => {
+    const ids = await lookupAdminUserIds(email);
+    for (const x of ids) if ((await adminAccess(x)).ok) return x;
+    return ids[0] ?? null;
+  })());
   const id = "u_" + randomBytes(6).toString("hex");
   await q(`INSERT INTO ev_users (id, email, name, role, admin_user_id, created_by) VALUES ($1,$2,$3,$4,$5,$6)`, [id, email, input.name.trim(), input.role, adminId, by.name]);
   return { id, invite_token: await newInvite(id), admin_user_id: adminId, linked_automatically: !input.admin_user_id && !!adminId };
@@ -198,13 +214,28 @@ export async function updateUser(id: string, patch: { role?: Role; active?: bool
     [id, patch.role ?? null, patch.active ?? null, patch.admin_user_id !== undefined, patch.admin_user_id?.trim() ?? "", patch.name ?? ""]
   );
 }
-export async function relinkAdmin(id: string) {
+/** Link a person to their admin login by email — their ev-bot email, or a different admin email
+ *  (e.g. jensen@precisionlabeling.com). If the email has several logins, the one that can use admin wins. */
+export async function relinkAdmin(id: string, adminEmail?: string) {
   const [u] = await q<{ email: string }>(`SELECT email FROM ev_users WHERE id=$1`, [id]);
   if (!u) throw new Error("No such user.");
-  const adminId = await lookupAdminUserId(u.email);
-  if (!adminId) throw new Error(`No admin account found for ${u.email}. Paste their admin user ID instead.`);
-  await q(`UPDATE ev_users SET admin_user_id=$2 WHERE id=$1`, [id, adminId]);
-  return adminId;
+  const email = norm(adminEmail || u.email);
+  if (!/^\S+@\S+\.\S+$/.test(email)) throw new Error("Enter a valid email.");
+  const ids = await lookupAdminUserIds(email);
+  if (!ids.length) throw new Error(`No admin login found for ${email}. Check the email they sign in to admin with, or paste their admin user ID.`);
+  const tests = await Promise.all(ids.map(async (x) => ({ id: x, ...(await adminAccess(x)) })));
+  const good = tests.find((t) => t.ok);
+  const pick = good ?? tests[0];
+  await q(`UPDATE ev_users SET admin_user_id=$2, admin_email=$3 WHERE id=$1`, [id, pick.id, email]);
+  return { admin_user_id: pick.id, admin_email: email, can_write: !!good, status: pick.status, logins_found: ids.length,
+    note: good ? undefined : `Found ${ids.length} login(s) for ${email}, but admin refused all of them (HTTP ${pick.status}). They may need admin permissions in admin itself.` };
+}
+export async function testAdminLink(id: string) {
+  const [u] = await q<{ admin_user_id: string | null; created_by: string | null }>(`SELECT admin_user_id, created_by FROM ev_users WHERE id=$1`, [id]);
+  if (!u) throw new Error("No such user.");
+  const adminId = u.admin_user_id || (u.created_by === "setup" ? config.sessionUserIdOrNull() : null);
+  if (!adminId) return { ok: false, status: 0, error: "Not linked to an admin login yet." };
+  return adminAccess(adminId);
 }
 export const resetInvite = async (id: string) => ({ invite_token: await newInvite(id) });
 

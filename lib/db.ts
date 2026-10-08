@@ -87,6 +87,7 @@ async function ensureSchema() {
           last_login_at     timestamptz
         )`);
       await s.query(`ALTER TABLE ev_runs ADD COLUMN IF NOT EXISTS requested_by_id text`);
+      await s.query(`ALTER TABLE ev_users ADD COLUMN IF NOT EXISTS admin_email text`);
       await s.query(`ALTER TABLE ev_runs ADD COLUMN IF NOT EXISTS admin_as text`);
       await s.query(`ALTER TABLE ev_runs ADD COLUMN IF NOT EXISTS approved_in_bot boolean`);
       await s.query(`

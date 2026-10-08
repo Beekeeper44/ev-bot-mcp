@@ -20,6 +20,8 @@ Everyone signs in with their own work email and password. Each person's writes g
 
 **First admin:** set `SETUP_CODE` in Vercel, deploy, open the site, and create your account with the code. It links to your admin login automatically. Remove `SETUP_CODE` afterward.
 
+**Linking to admin (Users tab):** **link by admin email** — enter the email the person signs in to *admin* with (it can differ from their ev-bot email, e.g. `jensen@precisionlabeling.com`). ev-bot finds every login for that email and keeps the one admin actually accepts. **test** checks a linked login can use the estimate-value endpoints. A failed submit now says why in the bottom bar (e.g. "admin refused this login").
+
 **Adding people (Users tab):** name, email, role → **Add person** → send them the invite link (one use, 48 h) to set their password. EV Bot finds their admin login from their email through SuperTokens. If it can't, paste their admin user ID (the `sub` in their admin token, or ask engineering). Until they're linked, their changes go through the shared login with "· by Name" added to the note (`SHARED_SESSION_FALLBACK=false` blocks that instead). Turn people off or change roles from the same tab; a forgotten password = **reset password link**.
 
 **Claude connector:** each person makes their own URL under **My account**. Runs from Claude carry their name and their role limits. Turning a person off kills their URL too.

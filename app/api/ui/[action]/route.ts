@@ -15,7 +15,7 @@ import { queryCards } from "@/lib/metabase";
 import { probeEv, openAdminSession, liveEv, type LiveEv } from "@/lib/admin";
 import {
   can, actorOf, currentUser, sessionCookie, clearCookie, signIn, needsSetup, setupFirstAdmin, inviteInfo, acceptInvite,
-  changePassword, listUsers, addUser, updateUser, relinkAdmin, resetInvite, newMcpKey, revokeMcpKey, type User, type Role,
+  changePassword, listUsers, addUser, updateUser, relinkAdmin, testAdminLink, resetInvite, newMcpKey, revokeMcpKey, type User, type Role,
 } from "@/lib/users";
 
 export const maxDuration = 300;
@@ -299,7 +299,9 @@ export async function POST(req: Request, ctx: Ctx) {
         return json({ ok: true });
       }
       case "users-relink":
-        return forbid(u, "admin") ?? json({ admin_user_id: await relinkAdmin(str("id")) });
+        return forbid(u, "admin") ?? json(await relinkAdmin(str("id"), str("email") || undefined));
+      case "users-test":
+        return forbid(u, "admin") ?? json(await testAdminLink(str("id")));
       case "users-invite": {
         const f = forbid(u, "admin");
         if (f) return f;

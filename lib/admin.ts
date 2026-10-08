@@ -279,3 +279,22 @@ export async function probeEv(itemId: string, adminUserId?: string) {
     await session.revoke();
   }
 }
+
+/** Can this admin login use the estimate-value endpoints? (a read-only search for a card that doesn't exist) */
+export async function adminAccess(adminUserId: string): Promise<{ ok: boolean; status: number; error?: string }> {
+  let session: AdminSession | null = null;
+  try {
+    session = await openAdminSession(adminUserId);
+    const res = await fetch(url(config.evHistoryPath() || "/admin/estimate-value/search"), {
+      method: "POST",
+      headers: headers(session.accessToken),
+      body: JSON.stringify({ where: { cardId: { equals: "00000000-0000-0000-0000-000000000000" } }, limit: 1, offset: 0 }),
+    });
+    if (res.ok) return { ok: true, status: res.status };
+    return { ok: false, status: res.status, error: (await res.text()).slice(0, 200) };
+  } catch (e) {
+    return { ok: false, status: 0, error: e instanceof Error ? e.message : String(e) };
+  } finally {
+    if (session) await session.revoke();
+  }
+}

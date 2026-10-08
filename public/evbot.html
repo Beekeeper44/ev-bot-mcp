@@ -530,7 +530,7 @@ function recentOf(rows,k){
   return { vals:[...new Set(hits.map(r=>r.recent.ev))], at, n:hits.length, approved:hits.every(r=>r.recent.status==="approved"), by:[...new Set(hits.map(r=>r.recent.by).filter(Boolean))] };
 }
 const recentBadge=d=>`<span class="didb" title="${d.n} ${d.n===1?"card":"cards"}${d.by.length?" · by "+esc(d.by.join(", ")):""} · shows for ${RECENT_DAYS} days">✓ ${d.approved?"approved":"submitted"} ${d.vals.slice(0,3).map(v=>money2(v)).join(", ")} · ${dayOf(d.at)}</span>`;
-async function find(text){
+async function find(text,opts={}){
   requestAnimationFrame(()=>{const i=$("#input");i.style.height="auto";i.style.height=Math.min(i.scrollHeight+2,200)+"px"});
   if(!text.trim()&&SCOPE!=="tasks"&&BAND==="all") return;
   const seq=++findSeq;
@@ -538,7 +538,8 @@ async function find(text){
   $("#empty").hidden=false; $("#empty").innerHTML=`<span class="spin"></span>${SCOPE==="tasks"?"Pulling cards waiting for an estimate…":"Searching Metabase 4131…"}`; $("#summary").innerHTML=""; $("#grid").innerHTML=""; $("#bar").hidden=true;
   let res;
   const B=BANDS.find(x=>x.id===BAND)||BANDS[0];
-  try{ res=await api("find",{text:ex.rest,scope:SCOPE,min_ev:B.min??null,max_ev:B.max??null}); }
+  const sendBand=!ex.rest.trim()||opts.band===true;
+  try{ res=await api("find",{text:ex.rest,scope:SCOPE,min_ev:sendBand?(B.min??null):null,max_ev:sendBand?(B.max??null):null}); }
   catch(e){ if(seq===findSeq) showEmpty(e.message); return; }
   if(seq!==findSeq) return;
   const at=new Date().toLocaleTimeString([], {hour:"numeric",minute:"2-digit",second:"2-digit"});
@@ -830,7 +831,7 @@ function renderBands(){
   const custom=has&&S.evRange&&S.evRange.typed&&!bandFor(S.evRange.min,S.evRange.max);
   bar.innerHTML=`<span class="dim small">EV range</span>${BANDS.map(b=>{
     // search already limited to one range: only that tab's count is known (the others load when clicked)
-    const limited=has&&S.serverBand&&!(S.evRange&&S.evRange.typed);
+    const limited=has&&S.serverBand;
     const n=!has||(limited&&b.id!==BAND)?null:(b.id==="all"?S.matched.length:S.matched.filter(r=>inBand(r,b.id)).length);
     return `<button type="button" class="band" data-band="${b.id}" aria-pressed="${BAND===b.id&&!custom}">${b.label}${n!=null?` <span class="cnt">${n.toLocaleString()}${b.id==="all"&&S.total>S.matched.length?"+":""}</span>`:""}</button>`;}).join("")}
     ${custom?`<span class="band on">Typed: ${S.evRange.min!=null?money(S.evRange.min):"$0"}${S.evRange.max!=null?"–"+money(S.evRange.max):"+"}</span>`:""}
@@ -839,7 +840,13 @@ function renderBands(){
     BAND=b.dataset.band;
     const text=$("#input").value.trim();
     // nothing on screen yet, results cut off, or the last search was limited to a range: fetch fresh
-    if(!S||S.phase!=="review"||S.total>S.matched.length||(S.serverBand&&!(S.evRange&&S.evRange.typed))||(!S.matched.length)){ if(text||BAND!=="all") find(text); else { renderBands(); } return; }
+    const typedRange=S&&S.evRange&&S.evRange.typed;
+    // nothing loaded yet, a range-only browse, or results cut off: fetch. Otherwise switch on screen and keep the results.
+    if(!S||S.phase!=="review"||(!S.lastText&&!typedRange)){ if(text||BAND!=="all") find(text); else { S=null; newRequest(); } return; }
+    if(S.total>S.matched.length&&!typedRange){ find(S.lastText,{band:BAND!=="all"}); return; }
+    if(typedRange){ // a range typed in the search box wins over the tabs; drop it and use the tab instead
+      const t=(S.lastText||"").trim(); const t2=t.replace(/\$?\s*[\d,]+(?:\.\d+)?\s*k?\s*(?:\+|or more|or greater|or higher|and up|plus)\s*(?:ev|value)?|\b(?:over|above|under|below|less than|more than|at least|between)\s*\$?\s*[\d,]+(?:\.\d+)?\s*k?(?:\s*(?:and|to|-)\s*\$?\s*[\d,]+(?:\.\d+)?\s*k?)?\s*(?:ev|value)?/gi," ").replace(/\s{2,}/g," ").trim(); $("#input").value=t2; find(t2); return; }
+    S.page=0; recompute(true);
     S.page=0; recompute(true);
   });
 }
@@ -936,7 +943,11 @@ async function run(sel,dry){
   if(!isDry){ const at=new Date().toISOString(); sel.filter(r=>written.has(r.item_id)).forEach(r=>{ r.recent={ev:evOf(r),at,by:ME&&ME.user,status:"submitted"}; }); }
   S.phase="done"; S.runId=res.run_id; S.dry=isDry; S.doneTarget=oneVal?evOf(sel[0]):null; S.done=sel.filter(r=>written.has(r.item_id)); render();
   renderHistory();
-  const failNote=(res.failed||res.mismatch)?` <span style="color:var(--warn)">${(res.failed||0)+(res.mismatch||0)} failed — shown on the tiles (click "Also show … not included").</span>`:"";
+  const why=(()=>{ const f=(res.failures||[])[0]; if(!f) return ""; const st=f.status; const msg=String(f.error||"");
+    if(st===401||st===403) return "admin refused this login — ask an EV Bot admin to use Users → link by admin email / test";
+    if(/last comp/i.test(msg)) return msg;
+    return (st?`HTTP ${st}: `:"")+msg.slice(0,140); })();
+  const failNote=(res.failed||res.mismatch)?` <span style="color:var(--warn)">${(res.failed||0)+(res.mismatch||0)} failed${why?` — ${esc(why)}`:""}.</span>`:"";
   const skipNote=res.skipped_no_longer_matching?` <span class="dim">${res.skipped_no_longer_matching} no longer matched (or were already at this value) and were skipped.</span>`:"";
   const skip2=(res.skipped_not_in_queue||[]).length?` <span class="dim">${res.skipped_not_in_queue.length} had already left the task list.</span>`:"";
   const batchNote=res.batchError?` <span style="color:var(--warn)">Stopped partway: ${esc(res.batchError)} — the cards not shown as submitted weren't sent.</span>`:"";
@@ -1307,8 +1318,8 @@ async function loadUsers(){
   $("#usersTbl").innerHTML=`<table><tr><th>person</th><th>role</th><th>admin login</th><th>status</th><th>last sign-in</th><th></th></tr>${users.map(u=>`<tr data-id="${esc(u.id)}">
     <td><b>${esc(u.name)}</b><br><span class="dim">${esc(u.email)}</span></td>
     <td><select data-f="role" ${u.id===ME.id?"disabled":""}>${(ME.full_access?["approver","admin"]:["viewer","editor","approver","admin"]).map(r=>`<option value="${r}" ${r===u.role||(ME.full_access&&r==="approver"&&u.role!=="admin")?"selected":""}>${ME.full_access&&r==="approver"?"member":r}</option>`).join("")}</select></td>
-    <td>${u.admin_user_id?`<span class="link-own">linked</span> <span class="dim small">${esc(u.admin_user_id.slice(0,8))}…</span>`:`<span class="link-shared">not linked</span>`}
-      <button class="btn link" data-act="relink">find from email</button><button class="btn link" data-act="setid">paste ID</button></td>
+    <td>${u.admin_user_id?`<span class="link-own">linked</span> <span class="dim small">${esc(u.admin_email||u.email)}</span>`:`<span class="link-shared">not linked</span>`}
+      <br><button class="btn link" data-act="relink">link by admin email</button><button class="btn link" data-act="test">test</button><button class="btn link" data-act="setid">paste ID</button></td>
     <td>${!u.active?`<span class="dim">off</span>`:u.has_password?"active":`<span class="link-shared">invited</span>`}${u.has_mcp_key?` · <span class="dim">Claude</span>`:""}</td>
     <td class="dim">${u.last_login_at?when(u.last_login_at):"—"}</td>
     <td>${u.id===ME.id?`<span class="dim small">you</span>`:`${u.active&&!u.has_password?`<button class="btn link" data-act="invite">new invite link</button>`:""}${u.active&&u.has_password?`<button class="btn link" data-act="invite">reset password link</button>`:""}<button class="btn link" data-act="toggle">${u.active?"turn off":"turn on"}</button>`}</td>
@@ -1320,7 +1331,13 @@ async function loadUsers(){
     try{
       if(b.dataset.act==="invite"){ const r=await post("users-invite",{id}); o.innerHTML=copyLine(r.invite_url,`Send to ${u.name} (works once, 48 hours; sets a new password):`); return; }
       if(b.dataset.act==="toggle"){ await post("users-update",{id,active:!u.active}); return loadUsers(); }
-      if(b.dataset.act==="relink"){ await post("users-relink",{id}); return loadUsers(); }
+      if(b.dataset.act==="relink"){
+        const email=prompt(`Email ${u.name} signs in to ADMIN with (can differ from their ev-bot email):`,u.admin_email||u.email); if(!email) return;
+        o.innerHTML=`<span class="small"><span class="spin"></span>Looking up ${esc(email)} and testing admin access…</span>`;
+        const r=await post("users-relink",{id,email:email.trim()});
+        await loadUsers(); out(id).innerHTML=r.can_write?`<span class="small link-own">✓ Linked to ${esc(r.admin_email)} — admin accepts this login, so ${esc(u.name)} can submit and approve.</span>`:`<span class="small" style="color:var(--warn)">${esc(r.note||"Linked, but admin didn't accept the login.")}</span>`; return; }
+      if(b.dataset.act==="test"){ o.innerHTML=`<span class="small"><span class="spin"></span>Testing…</span>`; const r=await post("users-test",{id});
+        o.innerHTML=r.ok?`<span class="small link-own">✓ Admin accepts ${esc(u.name)}'s login — submits and approves will work.</span>`:`<span class="small" style="color:var(--warn)">✗ Admin refused ${esc(u.name)}'s login (${r.status?`HTTP ${r.status}`:"not linked"}${r.error?": "+esc(r.error.slice(0,120)):""}). Use “link by admin email” with the email they use in admin, or give them admin permissions there.</span>`; return; }
       if(b.dataset.act==="setid"){ const v=prompt(`Admin user ID for ${u.name} (blank to unlink):`,u.admin_user_id||""); if(v===null) return; await post("users-update",{id,admin_user_id:v.trim()}); return loadUsers(); }
     }catch(e){ o.innerHTML=`<span style="color:var(--warn)">${esc(e.message)}</span>`; }
   });
