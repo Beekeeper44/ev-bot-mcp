@@ -56,6 +56,8 @@ export const config = {
   // Set to false to require every person to be linked.
   sharedSessionFallback: () => (process.env.SHARED_SESSION_FALLBACK ?? "true").toLowerCase() !== "false",
   sessionTenantId: () => process.env.ADMIN_SESSION_TENANT_ID || "public",
+  sessionMfaDone: () => (process.env.ADMIN_SESSION_MFA_DONE ?? "false").toLowerCase() === "true",
+  sessionMfaFactors: () => (process.env.ADMIN_SESSION_MFA_FACTORS || "emailpassword,thirdparty,totp,otp-email,otp-phone,link-email,link-phone").split(",").map((x) => x.trim()).filter(Boolean),
   sessionExtraPayload: (): Record<string, unknown> | undefined => {
     const raw = process.env.ADMIN_SESSION_EXTRA_PAYLOAD;
     if (!raw) return undefined;

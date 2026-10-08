@@ -5,6 +5,7 @@
 // Auth: a short-lived SuperTokens session minted server-side for the person doing the run.
 import supertokens from "supertokens-node";
 import Session from "supertokens-node/recipe/session";
+import UserRoles from "supertokens-node/recipe/userroles";
 import { config, type EvExtras } from "./config";
 
 let initialized = false;
@@ -22,7 +23,9 @@ function init() {
       apiBasePath: "/st/auth",
       websiteDomain: config.adminOrigin(),
     },
-    recipeList: [Session.init()],
+    // SUPERTOKENS_USER_ROLES=true adds the person's admin roles/permissions to the session it mints,
+    // for when admin checks roles in the token (symptom: their own admin works, ev-bot gets 403)
+    recipeList: [Session.init(), ...(process.env.SUPERTOKENS_USER_ROLES === "true" ? [UserRoles.init()] : [])],
   });
   initialized = true;
 }
@@ -35,7 +38,15 @@ export async function openAdminSession(adminUserId: string = config.sessionUserI
   const session = await Session.createNewSessionWithoutRequestResponse(
     config.sessionTenantId(),
     supertokens.convertToRecipeUserId(adminUserId),
-    config.sessionExtraPayload() ?? {},
+    {
+      ...(config.sessionExtraPayload() ?? {}),
+      // People whose admin account requires two-step sign-in (MFA): admin rejects a session without the
+      // "MFA completed" claim (403 st-mfa). With ADMIN_SESSION_MFA_DONE=true the session ev-bot mints says
+      // MFA is done — ev-bot's own sign-in is then the gate for these people.
+      ...(config.sessionMfaDone()
+        ? { "st-mfa": { c: Object.fromEntries(config.sessionMfaFactors().map((f) => [f, Math.floor(Date.now() / 1000) * 1000])), v: true } }
+        : {}),
+    },
     {},
     true
   );
