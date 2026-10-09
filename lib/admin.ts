@@ -150,7 +150,8 @@ export async function estimateHistory(session: AdminSession, itemId: string): Pr
   }
 }
 
-const recDate = (r: EstimateRecord) => String(r.finishedAt ?? r.createdAt ?? "");
+// when the estimate was made: the later of finishedAt / createdAt (a recomp can carry an older finishedAt)
+const recDate = (r: EstimateRecord) => [r.finishedAt, r.createdAt].map((x) => String(x ?? "")).sort().pop() ?? "";
 const byNewest = (a: EstimateRecord, b: EstimateRecord) => recDate(b).localeCompare(recDate(a));
 
 /** What's live for the card: its newest approved / skip-verify recomp estimate. undefined = couldn't read. */
