@@ -601,7 +601,7 @@ async function lookupCl(){
   let r; try{ r=await api("cl-value",{cert,grader:S.clGrader||"psa"}); }catch(e){ r={configured:true,ok:false,error:e.message}; }
   if(my!==clSeq||!S) return;
   if(!r.configured){ S.clStatus="off"; }
-  else if(r.ok&&r.value!=null){ S.clStatus="ok"; S.clValue=Math.round(r.value*100)/100; S.clUrl=r.url||null; S.clLastSale=r.last_sale||null; }
+  else if(r.ok&&r.value!=null){ S.clStatus="ok"; S.clValue=Math.floor(Math.round(r.value*100)/100+0.5); S.clUrl=r.url||null; S.clLastSale=r.last_sale||null; }
   else { S.clStatus="none"; S.clMsg=r.error?(r.status?`HTTP ${r.status}`:"")+" "+r.error.slice(0,60):"No CL value found"; }
   updateCl(true);
   if(S.clToast){ toast(`Cert <b>${esc(cert)}</b> · ${esc((GRADERS.find(([k])=>k===S.clGrader)||[,""])[1])} → CL Value <b>${S.clValue!=null?money2(S.clValue):S.clStatus==="off"?"not connected yet":"—"}</b>${S.clLastSale?` · last sale ${clSaleHtml(S.clLastSale)}`:""}`); S.clToast=false; }
@@ -919,7 +919,7 @@ async function infoCl(id){
   if(CL_CACHE.has(k)) return paint(CL_CACHE.get(k));
   paint(null);
   let r; try{ r=await api("cl-value",{cert,grader:gr}); }catch(e){ r={configured:true,ok:false,error:e.message}; }
-  if(r.ok) r.value=Math.round(r.value*100)/100;
+  if(r.ok) r.value=Math.floor(Math.round(r.value*100)/100+0.5); // whole dollars, .50 rounds up
   CL_CACHE.set(k,r); paint(r);
 }
 function showInfo(id){

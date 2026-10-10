@@ -23,7 +23,8 @@ export async function lookupCardLadder(input: { cert: string; grader: string }):
     const j = await res.json();
     const n = j?.estimatedValue == null || j.estimatedValue === "" ? null : Number(j.estimatedValue);
     if (n == null || !Number.isFinite(n)) return { configured: true, ok: false, error: "Card Ladder has no estimated value for this cert." };
-    return { configured: true, ok: true, value: Math.round(n * 100) / 100, last_sale: j?.lastSaleDate ? String(j.lastSaleDate) : null };
+    // whole dollars: .50 and up rounds up, .49 and below rounds down ($152.50 → $153, $152.49 → $152)
+    return { configured: true, ok: true, value: Math.floor(Math.round(n * 100) / 100 + 0.5), last_sale: j?.lastSaleDate ? String(j.lastSaleDate) : null };
   } catch (e) {
     return { configured: true, ok: false, error: e instanceof Error ? e.message : String(e) };
   }
