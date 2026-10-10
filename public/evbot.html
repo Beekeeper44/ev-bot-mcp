@@ -196,8 +196,15 @@ dialog.info{max-width:760px;width:calc(100% - 32px);padding:0}
 .kindpick:hover,.kindpick:focus-visible{background:color-mix(in srgb,var(--go) 12%,transparent);color:var(--go);outline:none}
 .kindpick.did{opacity:.75}
 .infonav{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px}
-.infoedit{display:flex;flex-wrap:wrap;gap:8px;align-items:end;margin:10px 0 12px;padding:10px;border:1px solid var(--go);border-radius:10px;background:color-mix(in srgb,var(--go) 7%,transparent)}
+/* popup edit box, in pairs: New EV | Last comp · Cert # | Grader · CL Value | Last sale · Use CL | Confirm */
+.infoedit{display:grid;grid-template-columns:1fr 1fr;gap:8px 10px;align-items:end;margin:10px 0 12px;padding:10px;border:1px solid var(--go);border-radius:10px;background:color-mix(in srgb,var(--go) 7%,transparent)}
+.infoedit > .small{grid-column:1 / -1}
+.infoedit input,.infoedit select,.infoedit .clbox,.infoedit #ieCert{width:100%!important;box-sizing:border-box}
+.infoedit > button{width:100%;justify-content:center}
 .infoedit label{display:flex;flex-direction:column;gap:3px;font-size:11px;font-weight:700}
+.infoedit select{height:36px;padding:0 8px;border:1px solid var(--line);border-radius:7px;background:var(--bg);color:var(--text);font:inherit;font-weight:700}
+.infoedit .clbox{height:36px;min-width:110px;font-size:14px}
+.infoedit #ieCert{width:130px}
 .infoedit input{width:120px;padding:7px 9px;border:1px solid var(--line);border-radius:7px;background:var(--bg);color:var(--text);font:inherit;font-size:15px;font-weight:700}
 .infoedit input.need{border-color:var(--warn)}
 .sortpick{margin-left:auto;display:flex;gap:6px;align-items:center}
@@ -213,19 +220,54 @@ dialog.info{max-width:760px;width:calc(100% - 32px);padding:0}
 .tile .facts b,.tile .row .dim{user-select:text}
 .evfield input{width:min(140px,40vw)}
 .evform{display:grid;grid-template-columns:1.6fr .7fr 1.2fr;gap:8px;margin-top:10px}
-.evform.evrow{grid-template-columns:minmax(150px,200px) minmax(150px,200px) 1fr;align-items:end;margin-top:0}
-.evform.evnote{grid-template-columns:1fr}
+.evform.evrow{grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1.15fr) minmax(0,.85fr) minmax(0,1fr) minmax(0,1fr);align-items:start;margin-top:0}
+.evform.evrow > label{justify-content:flex-start}
+.evform.evrow .lt{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;height:16px;line-height:16px}
+.evform.evrow #clCert,.evform.evrow #clGrader{height:42px;box-sizing:border-box;padding:0 10px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--text);font:inherit;font-size:14px;font-weight:700;width:100%}
+.clbox{display:flex;align-items:center;height:42px;box-sizing:border-box;padding:0 10px;border:1px dashed var(--line);border-radius:10px;font-size:15px;font-weight:800;gap:6px;overflow:hidden;white-space:nowrap}
+.clbox.ok{border-style:solid;border-color:var(--go);color:var(--go)}
+.clbox .note{font-size:11px;font-weight:400;color:var(--dim);white-space:normal;line-height:1.2}
+.salebox{display:flex;flex-direction:column;line-height:1.15;font-size:13px}
+.salebox .note{font-size:11px}
+.sale-old{color:#e5484d;font-weight:800}
+.sale-old .note{color:#e5484d}
+.sale-new{color:var(--go)}
+.clUse{margin-top:6px;padding:5px 6px;font-size:12px;width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.flashbox{animation:flashb 1s}
+@keyframes flashb{0%{box-shadow:0 0 0 3px var(--go)}100%{box-shadow:0 0 0 0 transparent}}
+#toast{position:fixed;right:16px;bottom:96px;z-index:50;max-width:380px;padding:10px 14px;border:1px solid var(--go);border-radius:10px;background:var(--panel);font-size:13px;box-shadow:0 6px 24px rgba(0,0,0,.35)}
+/* URL + note rows line up with Estimated value + Last comp (they end where Last comp ends) */
+.evform.evurl,.evform.evnote{grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1.15fr) minmax(0,.85fr) minmax(0,1fr) minmax(0,1fr)}
+.evform.evurl > label,.evform.evnote > label{grid-column:1 / 3}
+.evform.evurl input{height:42px;box-sizing:border-box;font-size:13px}
+
 .evform .tagfield{padding:0 10px}.evform .tagfield input{border:0;padding:8px 0;width:100%;min-width:0}
 .evform.evrow label{justify-content:flex-end}
-.evform.evrow .tagfield,.evform.evrow #urlIn{height:42px;box-sizing:border-box}
+.evform.evrow .tagfield{height:42px;box-sizing:border-box;width:100%;min-width:0}
+.evform.evrow{gap:8px}
+.evform.evrow > label{min-width:0}
+.evform.evrow .clbox{min-width:0;padding:0 8px}
+/* bigger value row: taller boxes, larger numbers */
+.evform.evrow{gap:10px}
+.evform.evrow .lt{font-size:12.5px;height:18px;line-height:18px}
+.evform.evrow .tagfield,.evform.evrow #clCert,.evform.evrow #clGrader,.evform.evrow .clbox{height:54px!important;border-radius:12px}
+.evform.evrow .tagfield b{font-size:20px}
+.evform.evrow .tagfield input{font-size:20px!important;font-weight:800}
+.evform.evrow #clCert{font-size:17px!important}
+.evform.evrow #clGrader{font-size:16px!important}
+.evform.evrow .clbox{font-size:20px}
+.evform.evrow .salebox{font-size:15px}
+.evform.evrow .salebox .note{font-size:12px}
+.clUse{margin-top:8px;padding:8px 6px;font-size:13px}
 .evform.evrow .tagfield input{height:100%;padding:0;font-size:15px;font-weight:700}
-.evform.evrow #urlIn{font-size:13px}
+
 .evform .lcfield{border-color:var(--line)}
 .evform label{display:flex;flex-direction:column;gap:3px;font-size:11.5px;font-weight:700}
 .evform input{padding:7px 9px;border:1px solid var(--line);border-radius:7px;background:var(--bg);color:inherit;font:inherit;font-weight:400}
 .evform input.need{border-color:var(--warn)}
 .evform .req{color:var(--warn)}
-@media (max-width:720px){.evform,.evform.evrow{grid-template-columns:1fr}}
+@media (max-width:820px){.evform.evrow,.evform.evurl,.evform.evnote{grid-template-columns:1fr 1fr 1fr}}
+@media (max-width:720px){.evform,.evform.evrow,.evform.evurl,.evform.evnote{grid-template-columns:1fr}.evform.evurl > label,.evform.evnote > label{grid-column:auto}}
 .quick{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
 .quick .btn{padding:3px 8px;font-size:12px}
 .nowline{display:flex;gap:5px;align-items:center;flex-wrap:wrap;width:100%}
@@ -528,6 +570,44 @@ let BAND="all";
 const inBand=(r,b)=>{const B=BANDS.find(x=>x.id===b)||BANDS[0]; const v=r.ev||0; return (B.min==null||v>=B.min)&&(B.max==null||v<=B.max);};
 const bandFor=(min,max)=>{const b=BANDS.find(x=>x.id!=="all"&&(x.min??null)===(min??null)&&((x.max==null&&max==null)||(x.max!=null&&max!=null&&Math.floor(x.max)===Math.floor(max)))); return b?b.id:null;};
 const PAGE=200;
+/* Card Ladder: cert # + grader → CL Value; "Use CL value → EV" fills the estimated value.
+   Clicking a cert on a card copies it and fills the cert + grader boxes, then looks it up. */
+const GRADERS=[["psa","PSA"],["bgs","BGS"],["sgc","SGC"],["cgc","CGC"],["tag","TAG"],["arena_club","Arena Club"]];
+const graderOf=r=>{ const g=String(r.grading_company||String(r.grade||"").split(" ")[0]||"").toLowerCase().replace("beckett","bgs").replace(/arena\s*club/,"arena_club"); return GRADERS.some(([k])=>k===g)?g:"psa"; };
+/* last sale date from Card Ladder: red when it's more than 7 days old */
+function clSaleHtml(iso){
+  if(!iso) return `<span class="note">—</span>`;
+  const n=daysAgo(iso), old=n!=null&&n>7;
+  return `<span class="salebox ${old?"sale-old":"sale-new"}" title="${old?"Last sale is over 7 days old":"Sold in the last 7 days"}"><span>${dayOf(iso)}</span><span class="note">${n==null?"":n<=0?"today":n===1?"1 day ago":n+" days ago"}</span></span>`;
+}
+function clBoxHtml(){
+  if(!S) return "";
+  if(S.clStatus==="loading") return `<span class="spin"></span>`;
+  if(S.clValue!=null) return S.clUrl?`<a href="${esc(S.clUrl)}" target="_blank" rel="noopener">${money2(S.clValue)}</a>`:money2(S.clValue);
+  if(S.clStatus==="off") return `<span class="note" title="Card Ladder not connected yet (add CARD_LADDER_API_KEY)">not connected</span>`;
+  if(S.clStatus==="none") return `<span class="note" title="${esc(S.clMsg||"No CL value found")}">no value</span>`;
+  return `<span class="note" title="Click a cert on a card, or type one">—</span>`;
+}
+function updateCl(flash){
+  const b=$("#clBox"); if(!b) return; b.innerHTML=clBoxHtml(); b.classList.toggle("ok",S&&S.clValue!=null);
+  if(flash){ b.classList.remove("flashbox"); void b.offsetWidth; b.classList.add("flashbox"); }
+  const u=$("#clUse"); if(u) u.disabled=!(S&&S.clValue!=null&&S.phase==="review");
+  const sl=$("#clSale"); if(sl) sl.innerHTML=clSaleHtml(S&&S.clValue!=null?S.clLastSale:null);
+}
+let clSeq=0;
+async function lookupCl(){
+  if(!S) return; const cert=String(S.clCert||"").replace(/\D+/g,""); if(!cert){ S.clValue=null; S.clStatus=null; updateCl(); return; }
+  const my=++clSeq; S.clStatus="loading"; S.clValue=null; S.clUrl=null; S.clLastSale=null; updateCl();
+  let r; try{ r=await api("cl-value",{cert,grader:S.clGrader||"psa"}); }catch(e){ r={configured:true,ok:false,error:e.message}; }
+  if(my!==clSeq||!S) return;
+  if(!r.configured){ S.clStatus="off"; }
+  else if(r.ok&&r.value!=null){ S.clStatus="ok"; S.clValue=Math.round(r.value*100)/100; S.clUrl=r.url||null; S.clLastSale=r.last_sale||null; }
+  else { S.clStatus="none"; S.clMsg=r.error?(r.status?`HTTP ${r.status}`:"")+" "+r.error.slice(0,60):"No CL value found"; }
+  updateCl(true);
+  if(S.clToast){ toast(`Cert <b>${esc(cert)}</b> · ${esc((GRADERS.find(([k])=>k===S.clGrader)||[,""])[1])} → CL Value <b>${S.clValue!=null?money2(S.clValue):S.clStatus==="off"?"not connected yet":"—"}</b>${S.clLastSale?` · last sale ${clSaleHtml(S.clLastSale)}`:""}`); S.clToast=false; }
+}
+let toastT;
+function toast(html){ let t=$("#toast"); if(!t){ t=document.createElement("div"); t.id="toast"; t.setAttribute("role","status"); document.body.appendChild(t); } t.innerHTML=html; t.hidden=false; clearTimeout(toastT); toastT=setTimeout(()=>t.hidden=true,3500); }
 /* sort: newest EV first by default (age from admin's live date once loaded, else 4131); never-approved last */
 let SORT="age";
 const SORTS=[["age","EV age · newest first"],["age_old","EV age · oldest first"],["ev_hi","Value · high to low"],["ev_lo","Value · low to high"],["ac","AC # · newest first"]];
@@ -571,7 +651,7 @@ async function find(text,opts={}){
   if(!res.has_filter){ showEmpty("Add at least one filter: a player, set, parallel, grade, value range, AC number or cert number."); return; }
   const p=res.parsed;
   const keep=S&&S.target!=null&&res.target_ev==null?S.target:null; // keep a value already entered when only the cards change
-  const carry=S?{note:S.note||"",lastComp:S.lastComp??"",url:S.url||""}:{note:window.DEFAULT_NOTE||"mcp done",lastComp:"",url:""};
+  const carry=S?{note:S.note||"",lastComp:S.lastComp??"",url:S.url||"",clCert:S.clCert||"",clGrader:S.clGrader||"psa",clValue:S.clValue??null,clStatus:S.clStatus||null,clUrl:S.clUrl||null,clLastSale:S.clLastSale||null}:{note:window.DEFAULT_NOTE||"mcp done",lastComp:"",url:"",clGrader:"psa"};
   // a range typed in the request picks the matching tab (or "custom")
   if(res.ev_range&&res.ev_range.typed){ BAND=bandFor(res.ev_range.min,res.ev_range.max)||"all"; }
   if(ex.note!=null) carry.note=ex.note; if(ex.lc!=null) carry.lastComp=ex.lc; if(ex.url!=null) carry.url=ex.url;
@@ -631,11 +711,18 @@ function render(){
   $("#summary").innerHTML=`<div class="summary">
     <div>
       <div class="evform evrow">
-        <label>Estimated value<span class="tagfield evfield"><b>$</b><input id="evIn" aria-label="New estimated value in dollars" inputmode="decimal" value="${T==null?"":T}" placeholder="0.00" ${locked?"disabled":""}></span></label>
-        <label><span>Last comp <span class="dim" style="font-weight:400">· required if none</span></span><span class="tagfield evfield lcfield"><b>$</b><input id="lcIn" inputmode="decimal" value="${esc(S.lastComp)}" placeholder="0.00" aria-label="Last comp in dollars" ${locked?"disabled":""}></span></label>
-        <label>URL (optional)<input id="urlIn" type="url" value="${esc(S.url)}" placeholder="https://www.ebay.com/itm/…" ${locked?"disabled":""}></label>
+        <label><span class="lt">Estimated value</span><span class="tagfield evfield"><b>$</b><input id="evIn" aria-label="New estimated value in dollars" inputmode="decimal" value="${T==null?"":T}" placeholder="0.00" ${locked?"disabled":""}></span></label>
+        <label><span class="lt" title="Last comp — required when the card has no last comp yet">Last comp</span><span class="tagfield evfield lcfield"><b>$</b><input id="lcIn" inputmode="decimal" value="${esc(S.lastComp)}" placeholder="0.00" aria-label="Last comp in dollars" ${locked?"disabled":""}></span></label>
+        <label><span class="lt">Cert #</span><input id="clCert" inputmode="numeric" value="${esc(S.clCert||"")}" placeholder="cert" title="Click a cert on a card, or type one and press Enter" aria-label="Cert number for the Card Ladder lookup" ${locked?"disabled":""}></label>
+        <label><span class="lt">Grader</span><select id="clGrader" aria-label="Grading company" ${locked?"disabled":""}>${GRADERS.map(([k,l])=>`<option value="${k}" ${k===(S.clGrader||"psa")?"selected":""}>${l}</option>`).join("")}</select></label>
+        <label><span class="lt" title="Card Ladder estimated value">CL Value</span><span class="clbox" id="clBox">${clBoxHtml()}</span>
+          <button class="btn clUse" type="button" id="clUse" ${S.clValue!=null&&!locked?"":"disabled"} title="Put the CL Value into Estimated value">Use CL → EV</button></label>
+        <label><span class="lt" title="Card Ladder's last sale for this cert; red when it's over 7 days old">Last sale</span><span class="clbox" id="clSale">${clSaleHtml(S.clLastSale)}</span></label>
       </div>
       ${S.scope==="tasks"?`<label class="tog" style="margin:8px 0 2px"><input type="checkbox" id="cpIn" ${S.withCopies?"checked":""} ${locked?"disabled":""}><span><b>Also update every copy</b> in the warehouse (same set, card #, parallel, grade) — replaces their EV <span class="dim" id="cpN">${copyNote()}</span></span></label>`:""}
+      <div class="evform evurl">
+        <label>URL (optional)<input id="urlIn" type="url" value="${esc(S.url)}" placeholder="https://www.ebay.com/itm/…" ${locked?"disabled":""}></label>
+      </div>
       <div class="evform evnote">
         <label><span>Submit note <span class="req">*</span>${window.APPROVE?` <span class="dim" style="font-weight:400">· approve note: ${esc(window.APPROVE_NOTE)}</span>`:""}</span><input id="noteIn" maxlength="500" value="${esc(S.note)}" placeholder="e.g. recomp 9/30 · eBay last 3 avg" class="${S.note.trim()?"":"need"}" ${locked?"disabled":""}></label>
       </div>
@@ -699,10 +786,14 @@ function resultHeader(){
   </div>`;
 }
 /* copy buttons (cert, AC): copy without selecting/deselecting the tile */
-const copyBtn=(v,what)=>v?`<span class="copyb" role="button" tabindex="0" data-copy="${esc(v)}" title="Copy ${esc(what)}" aria-label="Copy ${esc(what)} ${esc(v)}">⧉</span>`:"";
-const copyVal=(v,what)=>v?`<span class="copyv" data-copy="${esc(v)}" title="Click to copy ${esc(what)}">${esc(v)}</span>`:"";
+const copyBtn=(v,what,card)=>v?`<span class="copyb" role="button" tabindex="0" data-copy="${esc(v)}" ${card?`data-cert-of="${esc(card)}"`:""} title="Copy ${esc(what)}${card?" + look up Card Ladder":""}" aria-label="Copy ${esc(what)} ${esc(v)}">⧉</span>`:"";
+const copyVal=(v,what,card)=>v?`<span class="copyv" data-copy="${esc(v)}" ${card?`data-cert-of="${esc(card)}"`:""} title="Click to copy ${esc(what)}${card?" + look up Card Ladder":""}">${esc(v)}</span>`:"";
 async function copyText(el){
   const v=el.dataset.copy; let ok=false;
+  // a cert: also fill the panel's Cert # + Grader and run the Card Ladder lookup
+  if(el.dataset.certOf&&S&&S.phase==="review"){ const card=(S.matched||[]).find(x=>x.item_id===el.dataset.certOf);
+    S.clCert=String(v).replace(/\D+/g,""); S.clGrader=card?graderOf(card):(S.clGrader||"psa"); S.clToast=true;
+    const cc=$("#clCert"), cg=$("#clGrader"); if(cc) cc.value=S.clCert; if(cg) cg.value=S.clGrader; lookupCl(); }
   if(el.classList.contains("copyv")){ const icon=el.nextElementSibling&&el.nextElementSibling.classList.contains("copyb")?el.nextElementSibling:null;
     el.classList.add("flash"); setTimeout(()=>el.classList.remove("flash"),900); if(icon) el=icon; }
   try{ await navigator.clipboard.writeText(v); ok=true; }catch{ const t=document.createElement("textarea"); t.value=v; document.body.appendChild(t); t.select(); try{ok=document.execCommand("copy")}catch{} t.remove(); }
@@ -767,7 +858,7 @@ function tile(r){
     else{ const p=pct(r.ev,v), b=isBig(r,v);
       change=`<span class="pill old">${money2(r.ev||0)}</span><span class="dim">→</span><span class="pill new">${money2(v)}</span>${p!=null?`<span class="${b?"pill big":p>=0?"up":"down"}">${p>=0?"+":""}${p}%</span>`:`<span class="pill big">no value</span>`}`; }
   }
-  const facts=[r.last_comp!==undefined?`Last comp <b>${r.last_comp!=null?money2(r.last_comp):"none"}</b>`:"", r.requested_at?`Requested <b>${when(r.requested_at)}</b>`:"", r.cert?`Cert ${copyVal(r.cert,"cert")}${copyBtn(r.cert,"cert")}`:"", r.tag?`Tag <b>${esc(r.tag)}</b>`:"", (r.bin||r.slot)?`Bin <b>${esc(r.bin??"—")}</b> · Slot <b>${esc(r.slot??"—")}</b>`:"", r.status?`Status <b>${esc(r.status)}</b>`:"", evLine(r)].filter(Boolean).join("<br>");
+  const facts=[r.last_comp!==undefined?`Last comp <b>${r.last_comp!=null?money2(r.last_comp):"none"}</b>`:"", r.requested_at?`Requested <b>${when(r.requested_at)}</b>`:"", r.cert?`Cert ${copyVal(r.cert,"cert",r.item_id)}${copyBtn(r.cert,"cert",r.item_id)}`:"", r.tag?`Tag <b>${esc(r.tag)}</b>`:"", (r.bin||r.slot)?`Bin <b>${esc(r.bin??"—")}</b> · Slot <b>${esc(r.slot??"—")}</b>`:"", r.status?`Status <b>${esc(r.status)}</b>`:"", evLine(r)].filter(Boolean).join("<br>");
   return `<div class="tw"><button type="button" class="infob" data-info="${esc(r.item_id)}" aria-label="Details for ${esc(r.player_name)}" title="Details">i</button><button type="button" class="tile" data-id="${r.item_id}" aria-pressed="${on}" ${S.phase!=="review"?"disabled":""} aria-label="${esc(r.player_name)} ${esc(r.set_name)}">
     <span class="check" aria-hidden="true">${on?"✓":""}</span>
     <div class="slab"><div class="lbl"><span>${esc((r.grade||"").toUpperCase())}</span><span>${r.parallel_total?"/"+esc(r.parallel_total):""}</span></div>
@@ -814,6 +905,23 @@ function infoGo(id,step){
   const next=list[j]; const pg=Math.floor(j/PAGE); if(S.page!==pg){ S.page=pg; }
   render(); showInfo(next.item_id); return true;
 }
+/* Card Ladder inside the card popup: looks up this card's cert as soon as it opens (cached per cert + grader) */
+const CL_CACHE=new Map();
+async function infoCl(id){
+  const d=$("#info"), box=d.querySelector("#ieCl"), use=d.querySelector("#ieClUse"); if(!box) return;
+  const cert=(d.querySelector("#ieCert").value||"").replace(/\D+/g,""), gr=d.querySelector("#ieGr").value, k=cert+"|"+gr;
+  const paint=r=>{ if(d.dataset.card!==id) return;
+    box.classList.toggle("ok",!!(r&&r.ok));
+    box.innerHTML=!r?`<span class="spin"></span><span class="note">Looking up…</span>`:r.ok?money2(r.value):!r.configured?`—<span class="note">Card Ladder not connected yet</span>`:`—<span class="note">${esc((r.status?`HTTP ${r.status} `:"")+(r.error||"No CL value").slice(0,60))}</span>`;
+    use.disabled=!(r&&r.ok); use.dataset.v=r&&r.ok?r.value:"";
+    const sb=d.querySelector("#ieSale"); if(sb) sb.innerHTML=clSaleHtml(r&&r.ok?r.last_sale:null); };
+  if(!cert){ box.classList.remove("ok"); box.innerHTML=`<span class="note">No cert on this card</span>`; use.disabled=true; const sb=d.querySelector("#ieSale"); if(sb) sb.innerHTML=clSaleHtml(null); return; }
+  if(CL_CACHE.has(k)) return paint(CL_CACHE.get(k));
+  paint(null);
+  let r; try{ r=await api("cl-value",{cert,grader:gr}); }catch(e){ r={configured:true,ok:false,error:e.message}; }
+  if(r.ok) r.value=Math.round(r.value*100)/100;
+  CL_CACHE.set(k,r); paint(r);
+}
 function showInfo(id){
   const r=(S&&S.matched||[]).find(c=>c.item_id===id); if(!r) return;
   const list=infoList(), idx=list.findIndex(x=>x.item_id===id);
@@ -835,6 +943,11 @@ function showInfo(id){
       ${editable?`<div class="infoedit">
         <label>New EV $<input id="ieEv" inputmode="decimal" value="${esc(o.ev??"")}" placeholder="${S.target!=null?S.target:"0.00"}" aria-label="New estimated value for this card"></label>
         <label>Last comp $<input id="ieLc" inputmode="decimal" value="${esc(o.lc??"")}" placeholder="${r.last_comp!=null?"keep "+money2(r.last_comp).slice(1):S.lastComp!==""&&S.lastComp!=null?S.lastComp:r.last_comp===null?"required":"optional"}" aria-label="Last comp for this card"></label>
+        <label>Cert #<input id="ieCert" inputmode="numeric" value="${esc(r.cert||"")}" aria-label="Cert number for Card Ladder"></label>
+        <label>Grader<select id="ieGr" aria-label="Grading company">${GRADERS.map(([k,l])=>`<option value="${k}" ${k===graderOf(r)?"selected":""}>${l}</option>`).join("")}</select></label>
+        <label>CL Value<span class="clbox" id="ieCl"><span class="note">—</span></span></label>
+        <label>Last sale<span class="clbox" id="ieSale"><span class="note">—</span></span></label>
+        <button class="btn" type="button" id="ieClUse" disabled>Use CL value → EV</button>
         <button class="btn primary" type="button" id="ieOk">${idx<list.length-1?"Confirm EV &amp; next ›":"Confirm EV &amp; finish"}</button>
         <div class="small dim" style="flex-basis:100%">${cur!=null&&validTarget(cur)?`Will submit <b>${money2(cur)}</b>${o.ev?"":" (panel value)"} · `:""}Enter = confirm &amp; next · ← → = move (typed values are kept) · Esc = close</div>
       </div>`:""}
@@ -847,7 +960,7 @@ function showInfo(id){
         ${row("Current tag",r.tag?`<span class="pill">${esc(r.tag)}</span>`:"no tag")}
         ${row("Status",esc(r.status))}
         ${row("Sport",esc(r.sport))}
-        ${row("Card number",esc(r.set_number))}${row("Cert",r.cert?copyVal(r.cert,"cert")+copyBtn(r.cert,"cert"):"")}${row("AC number",r.ac?copyVal(r.ac,"AC number")+copyBtn(r.ac,"AC number"):"")}
+        ${row("Card number",esc(r.set_number))}${row("Cert",r.cert?copyVal(r.cert,"cert",r.item_id)+copyBtn(r.cert,"cert",r.item_id):"")}${row("AC number",r.ac?copyVal(r.ac,"AC number")+copyBtn(r.ac,"AC number"):"")}
         ${row("Storage",(r.bin||r.slot)?`Bin ${esc(r.bin??"—")} · Slot ${esc(r.slot??"—")}`:"")}
         ${row("Order",esc(r.order_number))}${row("PO",esc(r.po_number))}
         ${row("Purchase cost",r.purchase_cost!=null?money(r.purchase_cost):"")}${row("Bought at",esc(r.purchase_location))}
@@ -869,7 +982,13 @@ function showInfo(id){
   const ok=$("#ieOk"); if(ok) ok.onclick=()=>{ const ev=$("#ieEv"); if(ev&&ev.value.trim()===""&&!(S.target!=null&&validTarget(S.target))){ ev.classList.add("need"); ev.focus(); return; }
     if(!infoSave(id)) return; S.selected.add(id); if(!infoGo(id,1)){ render(); showInfo(id); const sb2=$("#infoSubmit"); if(sb2) sb2.focus(); } };
   const sb=$("#infoSubmit"); if(sb) sb.onclick=()=>{ if(!infoSave(id)) return; d.close(); render(); setTimeout(()=>$("#confirmBtn").click(),50); };
+  d.dataset.card=id;
+  const ic=$("#ieCert"), ig=$("#ieGr"), iu=$("#ieClUse");
+  if(ic){ ic.onchange=()=>infoCl(id); ig.onchange=()=>infoCl(id);
+    iu.onclick=()=>{ const ev=$("#ieEv"); if(iu.dataset.v){ ev.value=iu.dataset.v; ev.classList.remove("need","flashbox"); void ev.offsetWidth; ev.classList.add("flashbox"); ev.focus(); } };
+    infoCl(id); }
   d.onkeydown=e=>{
+    if(e.key==="Enter"&&(e.target.id==="ieCert"||e.target.id==="ieGr")){ e.preventDefault(); infoCl(id); return; }
     if(e.key==="ArrowRight"){ e.preventDefault(); if(infoSave(id)) infoGo(id,1); }
     else if(e.key==="ArrowLeft"){ e.preventDefault(); if(infoSave(id)) infoGo(id,-1); }
     else if(e.key==="Enter"&&ok&&!e.shiftKey){ e.preventDefault(); ok.click(); }
@@ -936,6 +1055,10 @@ function bindSummary(){
   document.querySelectorAll(".kindpick").forEach(b=>b.onclick=()=>{ S.kind=b.dataset.kind||null; S.kindOpen=false; S.page=0; recompute(true); });
   const ka=$("#kindAll"); if(ka) ka.onclick=()=>{ S.kind=null; S.kindOpen=false; S.page=0; recompute(true); };
   const kt=$("#kindToggle"); if(kt) kt.onclick=()=>{ S.kindOpen=!S.kindOpen; render(); };
+  const cc=$("#clCert"); if(cc){ cc.oninput=()=>{S.clCert=cc.value.replace(/\D+/g,"");}; cc.onchange=()=>lookupCl(); cc.onkeydown=e=>{ if(e.key==="Enter"){ e.preventDefault(); lookupCl(); } }; }
+  const cg=$("#clGrader"); if(cg) cg.onchange=()=>{ S.clGrader=cg.value; if(S.clCert) lookupCl(); };
+  const cu=$("#clUse"); if(cu) cu.onclick=()=>{ if(S.clValue==null) return; S.target=S.clValue; recompute(false); const e=$("#evIn"); if(e){ e.classList.remove("flashbox"); void e.offsetWidth; e.classList.add("flashbox"); } };
+  updateCl();
   const cp=$("#cpIn"); if(cp) cp.onchange=()=>{S.withCopies=cp.checked; S.copiesKey=""; render();};
   const ni=$("#noteIn"); if(ni) ni.oninput=()=>{S.note=ni.value;ni.classList.toggle("need",!ni.value.trim());renderBar(S._n,S._big)};
   const li=$("#lcIn"); if(li) li.oninput=()=>{S.lastComp=li.value.replace(/[$,\s]/g,"");renderBar(S._n,S._big)};

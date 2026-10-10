@@ -11,6 +11,7 @@ import { parsePasted, searchPasted } from "@/lib/paste";
 import { readTags, hasTag } from "@/lib/tagfilter";
 import { titleSearch, looksLikeTcg } from "@/lib/title";
 import { readEvRange } from "@/lib/evrange";
+import { lookupCardLadder } from "@/lib/cardladder";
 import { queryCards } from "@/lib/metabase";
 import { probeEv, openAdminSession, liveEv, type LiveEv } from "@/lib/admin";
 import {
@@ -245,6 +246,9 @@ export async function POST(req: Request, ctx: Ctx) {
         return forbid(u, "editor") ?? json(await withdrawQueued({ item_ids: (body.item_ids as string[]) ?? [], actor: actorOf(u) }));
       case "undo":
         return forbid(u, "editor") ?? json(await undoRun({ run_id: str("run_id"), confirm: true, actor: actorOf(u) }));
+      case "cl-value":
+        // Card Ladder value for a cert (placeholder until the real API is wired)
+        return json(await lookupCardLadder({ cert: str("cert"), grader: str("grader") }));
       case "ev-live": {
         // live EV history from admin for the cards on screen (Snowflake can lag): newest approved / recomp + anything waiting
         const ids = [...new Set(((body.item_ids as string[]) ?? []).filter((x) => /^[0-9a-f-]{36}$/i.test(x)))].slice(0, 100);

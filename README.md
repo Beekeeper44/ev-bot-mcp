@@ -95,3 +95,9 @@ The value can also be typed in the `$` field, or picked with **Use median**, **U
 - Passwords are stored as scrypt hashes; invite links and connector keys are stored only as SHA-256 hashes and shown once.
 - Sign-in locks for 15 minutes after 8 wrong tries. Sessions last 14 days, and every request re-checks that the account is still on.
 - Role checks happen on the server for the screen and the connector alike; tool arguments can't change who a run is by.
+
+## Card Ladder (CL Value)
+
+The panel row is **Estimated value · Last comp · Cert # · Grader · CL Value**. Clicking a cert on a card (the number or ⧉) copies it, fills Cert # and Grader from that card, and looks up its Card Ladder value; **Use CL value → EV** puts it in Estimated value. You can also type a cert and press Enter.
+
+The lookup calls Card Ladder `GET /estimate?cert=…&grader=…` and uses `estimatedValue` only. Set `CARD_LADDER_API_KEY` in Vercel (the URL is built in). If Card Ladder answers 401/403, set `CARD_LADDER_KEY_IN_URL=true` (also sends `?key=`) or `CARD_LADDER_KEY_HEADER` to the header name it expects.
