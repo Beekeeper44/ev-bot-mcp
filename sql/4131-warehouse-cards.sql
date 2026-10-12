@@ -47,6 +47,10 @@
   Also added LAST_COMP — last comp on that same approved record (ev-bot uses
   it to know which cards still need a last comp).
 
+  CHANGE 2026-10-11: ORDER_NUMBER column (the order #; NUMBER kept for older
+  tools) and optional order_number / po_number filters (exact match, leading
+  '#' ignored) so ev-bot can pull one order's cards fast.
+
   NOTE: "tag"/"INSERT" are reserved words — keep them double-quoted.
   ======================================================================*/
 SELECT
@@ -66,6 +70,7 @@ SELECT
   "SOURCE"."EV_AGE_DAYS"            AS "EV_AGE_DAYS",
   "SOURCE"."ESTIMATED_VALUE"        AS "ESTIMATED_VALUE",
   "SOURCE"."LAST_COMP"              AS "LAST_COMP",
+  "SOURCE"."ORDER_NUMBER"           AS "ORDER_NUMBER",
   "SOURCE"."NUMBER"                 AS "NUMBER",
   "SOURCE"."TAG"                    AS "TAG",
   "SOURCE"."ITEM_STATUS"            AS "ITEM_STATUS",
@@ -104,6 +109,7 @@ FROM (
     spa.purchase_cost_cents / 100                 AS purchase_cost,
     admin_orders.purchase_location                AS purchase_location,
     pm.po_number                                  AS po_number,
+    orders.number::text                           AS order_number,  -- NEW 2026-10-11: the order # (same as NUMBER)
     orders.number,
     cards__i."TAG"                                AS "TAG",
     cards__i.status                               AS item_status,
@@ -192,6 +198,9 @@ FROM (
     [[AND ccert.cert_number::text ILIKE '%' || {{cert_number}} || '%']]
     [[AND cards.number::text ILIKE '%' || {{ac_number}} || '%']]
     [[AND LOWER(LTRIM(cards.set_number::text, '#')) ILIKE '%' || LOWER(LTRIM({{set_number}}, '#')) || '%']]
+    -- NEW 2026-10-11: exact order # / PO # (ev-bot "order 1234567", "po 4386")
+    [[AND orders.number::text = LTRIM({{order_number}}, '#')]]
+    [[AND pm.po_number::text = LTRIM({{po_number}}, '#')]]
 ) AS "SOURCE"
 WHERE 1 = 1
   [[AND "SOURCE"."EV_AGE_DAYS" >= {{min_ev_age_days}}]]

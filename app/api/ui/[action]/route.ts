@@ -11,6 +11,7 @@ import { parsePasted, searchPasted } from "@/lib/paste";
 import { readTags, hasTag } from "@/lib/tagfilter";
 import { titleSearch, looksLikeTcg } from "@/lib/title";
 import { readEvRange } from "@/lib/evrange";
+import { readOrders } from "@/lib/orders";
 import { lookupCardLadder } from "@/lib/cardladder";
 import { queryCards } from "@/lib/metabase";
 import { probeEv, openAdminSession, liveEv, type LiveEv } from "@/lib/admin";
@@ -134,7 +135,9 @@ export async function POST(req: Request, ctx: Ctx) {
         const maxs = [typed ? rng.max : num(body.max_ev)].filter((x): x is number => x != null);
         const evMin = mins.length ? Math.max(...mins) : null, evMax = maxs.length ? Math.min(...maxs) : null;
         const rangeF = { ...(evMin != null ? { min_estimated_value: evMin } : {}), ...(evMax != null ? { max_estimated_value: evMax } : {}) };
-        const { target, rest } = readTarget(rng.rest);
+        // order / PO numbers ("order 1234567", "po 4386")
+        const ord = readOrders(rng.rest);
+        const { target, rest } = readTarget(ord.rest);
         if (body.scope === "tasks") {
           // cards waiting for an estimate, narrowed by whatever was typed (blank = all of them)
           const t0 = Date.now();
@@ -159,9 +162,15 @@ export async function POST(req: Request, ctx: Ctx) {
         const tg = pasted ? { tags: [], untagged: false, rest } : readTags(rest);
         // tag only ("tag sd_wemby_grail"): pull the cards with that tag straight from 4131
         const tagOnly = !pasted && (tg.tags.length > 0) && !tg.rest;
+        // order / PO on its own: that order's cards, straight from 4131
+        const orderOnly = !pasted && !tg.tags.length && !tg.rest.trim() && (ord.orders.length + ord.pos.length) > 0;
         // a range on its own (a tab picked, nothing typed): every warehouse card in that range
-        const rangeOnly = !pasted && !tg.tags.length && !tg.untagged && !tg.rest.trim() && Object.keys(rangeF).length > 0;
-        const r0 = rangeOnly
+        const rangeOnly = !orderOnly && !pasted && !tg.tags.length && !tg.untagged && !tg.rest.trim() && Object.keys(rangeF).length > 0;
+        const ordF = [...ord.orders.map((o) => ({ order_number: o })), ...ord.pos.map((p) => ({ po_number: p }))];
+        const r0 = orderOnly
+          ? await (async () => { const t0 = Date.now(); const rows = (await Promise.all(ordF.map((f) => queryCards({ ...f, ...rangeF })))).flat();
+              return { parsed: { filters: {}, post_filters: {} }, has_filter: true, queries: ordF, ms: Date.now() - t0, rows: [...new Map(rows.map((x) => [x.item_id, x])).values()], missing: [] as string[] }; })()
+          : rangeOnly
           ? await (async () => { const t0 = Date.now(); const rows = await queryCards(rangeF);
               return { parsed: { filters: {}, post_filters: {} }, has_filter: true, queries: [rangeF], ms: Date.now() - t0, rows, missing: [] as string[] }; })()
           : tagOnly
@@ -179,12 +188,15 @@ export async function POST(req: Request, ctx: Ctx) {
               return (await asTitle()) ?? r1 ?? (await smartSearch(tg.rest, rangeF));
             })();
         // tag filter on top of whatever else was typed
+        const bareN = (x: unknown) => String(x ?? "").replace(/^#/, "").trim().toLowerCase();
         const tagRows = r0.rows.filter((x) => hasTag(x.tag, tg.tags) && (!tg.untagged || !x.tag)
+          && (!ord.orders.length || ord.orders.some((o) => bareN(x.order_number) === bareN(o)))
+          && (!ord.pos.length || ord.pos.some((p) => bareN(x.po_number) === bareN(p)))
           && (evMin == null || (x.estimated_value ?? 0) >= evMin) && (evMax == null || (x.estimated_value ?? 0) <= evMax)
           // a year on its own ("2020 basketball") holds results to sets from that year
           && (!rng.year || pasted != null || String(x.set_name ?? "").includes(rng.year)));
         const r = { ...r0, rows: tagRows, queries: r0.queries,
-          parsed: { ...r0.parsed, filters: { ...(r0.parsed?.filters ?? {}), ...rangeF, ...(rng.year && !pasted ? { year: rng.year } : {}), ...(tg.tags.length ? { tag: tg.tags.join(" or ") } : {}), ...(tg.untagged ? { tag: "none (untagged)" } : {}) } },
+          parsed: { ...r0.parsed, filters: { ...(r0.parsed?.filters ?? {}), ...rangeF, ...(rng.year && !pasted ? { year: rng.year } : {}), ...(ord.orders.length ? { order_number: ord.orders.join(", ") } : {}), ...(ord.pos.length ? { po_number: ord.pos.join(", ") } : {}), ...(tg.tags.length ? { tag: tg.tags.join(" or ") } : {}), ...(tg.untagged ? { tag: "none (untagged)" } : {}) } },
           has_filter: r0.has_filter || tg.tags.length > 0 || tg.untagged };
         const LIMIT = 6000; // the screen pages through these 200 at a time
         // submitted through ev-bot in the last 7 days (any teammate) — marked in the versions list

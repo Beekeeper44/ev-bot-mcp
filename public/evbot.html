@@ -230,6 +230,13 @@ dialog.info{max-width:760px;width:calc(100% - 32px);padding:0}
 .salebox{display:flex;flex-direction:column;line-height:1.15;font-size:13px}
 .salebox .note{font-size:11px}
 .sale-old{color:#e5484d;font-weight:800}
+/* Card Ladder Off: the earlier, simpler layout */
+body.cl-off .clonly{display:none!important}
+body.cl-off .evform.evrow,body.cl-off .evform.evurl,body.cl-off .evform.evnote{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+body.cl-off .evform.evurl > label,body.cl-off .evform.evnote > label{grid-column:1 / -1}
+.titlerow{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.clmode{display:inline-flex;align-items:center;gap:4px;vertical-align:middle}
+.clmode button{padding:2px 9px;font-size:11.5px}
 .sale-old .note{color:#e5484d}
 .sale-new{color:var(--go)}
 .clUse{margin-top:6px;padding:5px 6px;font-size:12px;width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -309,7 +316,8 @@ dialog .acts{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}
 <body>
 <div class="wrap">
   <div class="top">
-    <h1>EV <span>Bot</span></h1>
+    <div class="titlerow"><h1>EV <span>Bot</span></h1>
+      <span class="seg clmode" role="group" aria-label="Card Ladder"><span class="dim small">Card Ladder</span><button type="button" data-cl="on" aria-pressed="true">On</button><button type="button" data-cl="off" aria-pressed="false">Off</button></span></div>
     <nav class="tabs" role="tablist" aria-label="Sections">
       <button role="tab" id="tabBtn-request" aria-selected="true" aria-controls="tab-request" type="button">Request <span class="badge-n" id="taskCount" hidden></span></button>
       <button role="tab" id="tabBtn-approve" aria-selected="false" aria-controls="tab-approve" type="button">Approve <span class="badge-n" id="apprCount" hidden></span></button>
@@ -570,6 +578,18 @@ let BAND="all";
 const inBand=(r,b)=>{const B=BANDS.find(x=>x.id===b)||BANDS[0]; const v=r.ev||0; return (B.min==null||v>=B.min)&&(B.max==null||v<=B.max);};
 const bandFor=(min,max)=>{const b=BANDS.find(x=>x.id!=="all"&&(x.min??null)===(min??null)&&((x.max==null&&max==null)||(x.max!=null&&max!=null&&Math.floor(x.max)===Math.floor(max)))); return b?b.id:null;};
 const PAGE=200;
+/* Card Ladder on/off: Off = the earlier layout (Estimated value · Last comp only; no cert / grader / CL / last sale,
+   and clicking a cert just copies it). Remembered in this browser. */
+let CL_ON=true; try{ CL_ON=localStorage.getItem("evbot_cl")!=="off"; }catch{}
+function setClMode(on){
+  CL_ON=on; try{ localStorage.setItem("evbot_cl",on?"on":"off"); }catch{}
+  document.body.classList.toggle("cl-off",!on);
+  document.querySelectorAll(".clmode button").forEach(b=>b.setAttribute("aria-pressed",String((b.dataset.cl==="on")===on)));
+  if(S&&S.phase==="review") render();
+}
+document.querySelectorAll(".clmode button").forEach(b=>b.onclick=()=>setClMode(b.dataset.cl==="on"));
+document.body.classList.toggle("cl-off",!CL_ON);
+setTimeout(()=>setClMode(CL_ON),0);
 /* Card Ladder: cert # + grader → CL Value; "Use CL value → EV" fills the estimated value.
    Clicking a cert on a card copies it and fills the cert + grader boxes, then looks it up. */
 const GRADERS=[["psa","PSA"],["bgs","BGS"],["sgc","SGC"],["cgc","CGC"],["tag","TAG"],["arena_club","Arena Club"]];
@@ -705,7 +725,7 @@ function render(){
   const kinds=[...new Set(sel.map(cardKey))];
   const vals=S.rows.map(r=>r.ev||0).filter(v=>v>0).sort((a,b)=>a-b);
   const med=vals.length?vals[Math.floor(vals.length/2)]:null;
-  const lab={insert:"insert",pasted:"pasted",note:"note",set_number:"card #",contains:"also matches",ac_number:"AC #",cert_number:"cert",player_name:"player",set_name:"set",parallel_name:"parallel",grading_company:"grader",grade:"grade",min_estimated_value:"EV from",max_estimated_value:"EV up to",sport:"sport",tag:"tag"};
+  const lab={order_number:"order",po_number:"PO",insert:"insert",pasted:"pasted",note:"note",set_number:"card #",contains:"also matches",ac_number:"AC #",cert_number:"cert",player_name:"player",set_name:"set",parallel_name:"parallel",grading_company:"grader",grade:"grade",min_estimated_value:"EV from",max_estimated_value:"EV up to",sport:"sport",tag:"tag"};
   const chips=Object.entries(S.filters).map(([k,v])=>`<span class="chip"><i>${Array.isArray(v)?`${lab[k]||k}s (${v.length})`:(lab[k]||k)}</i> ${esc(k.includes("value")?money(v):v==="__base__"?"base (no parallel)":Array.isArray(v)?v.join(" or "):String(v).replace("%"," "))}</span>`).join("")+(S.post&&S.post.only_base?`<span class="chip"><i>parallel</i> base only</span>`:"");
   const locked=S.phase!=="review";
   $("#summary").innerHTML=`<div class="summary">
@@ -713,11 +733,11 @@ function render(){
       <div class="evform evrow">
         <label><span class="lt">Estimated value</span><span class="tagfield evfield"><b>$</b><input id="evIn" aria-label="New estimated value in dollars" inputmode="decimal" value="${T==null?"":T}" placeholder="0.00" ${locked?"disabled":""}></span></label>
         <label><span class="lt" title="Last comp — required when the card has no last comp yet">Last comp</span><span class="tagfield evfield lcfield"><b>$</b><input id="lcIn" inputmode="decimal" value="${esc(S.lastComp)}" placeholder="0.00" aria-label="Last comp in dollars" ${locked?"disabled":""}></span></label>
-        <label><span class="lt">Cert #</span><input id="clCert" inputmode="numeric" value="${esc(S.clCert||"")}" placeholder="cert" title="Click a cert on a card, or type one and press Enter" aria-label="Cert number for the Card Ladder lookup" ${locked?"disabled":""}></label>
-        <label><span class="lt">Grader</span><select id="clGrader" aria-label="Grading company" ${locked?"disabled":""}>${GRADERS.map(([k,l])=>`<option value="${k}" ${k===(S.clGrader||"psa")?"selected":""}>${l}</option>`).join("")}</select></label>
-        <label><span class="lt" title="Card Ladder estimated value">CL Value</span><span class="clbox" id="clBox">${clBoxHtml()}</span>
+        <label class="clonly"><span class="lt">Cert #</span><input id="clCert" inputmode="numeric" value="${esc(S.clCert||"")}" placeholder="cert" title="Click a cert on a card, or type one and press Enter" aria-label="Cert number for the Card Ladder lookup" ${locked?"disabled":""}></label>
+        <label class="clonly"><span class="lt">Grader</span><select id="clGrader" aria-label="Grading company" ${locked?"disabled":""}>${GRADERS.map(([k,l])=>`<option value="${k}" ${k===(S.clGrader||"psa")?"selected":""}>${l}</option>`).join("")}</select></label>
+        <label class="clonly"><span class="lt" title="Card Ladder estimated value">CL Value</span><span class="clbox" id="clBox">${clBoxHtml()}</span>
           <button class="btn clUse" type="button" id="clUse" ${S.clValue!=null&&!locked?"":"disabled"} title="Put the CL Value into Estimated value">Use CL → EV</button></label>
-        <label><span class="lt" title="Card Ladder's last sale for this cert; red when it's over 7 days old">Last sale</span><span class="clbox" id="clSale">${clSaleHtml(S.clLastSale)}</span></label>
+        <label class="clonly"><span class="lt" title="Card Ladder's last sale for this cert; red when it's over 7 days old">Last sale</span><span class="clbox" id="clSale">${clSaleHtml(S.clLastSale)}</span></label>
       </div>
       ${S.scope==="tasks"?`<label class="tog" style="margin:8px 0 2px"><input type="checkbox" id="cpIn" ${S.withCopies?"checked":""} ${locked?"disabled":""}><span><b>Also update every copy</b> in the warehouse (same set, card #, parallel, grade) — replaces their EV <span class="dim" id="cpN">${copyNote()}</span></span></label>`:""}
       <div class="evform evurl">
@@ -791,7 +811,7 @@ const copyVal=(v,what,card)=>v?`<span class="copyv" data-copy="${esc(v)}" ${card
 async function copyText(el){
   const v=el.dataset.copy; let ok=false;
   // a cert: also fill the panel's Cert # + Grader and run the Card Ladder lookup
-  if(el.dataset.certOf&&S&&S.phase==="review"){ const card=(S.matched||[]).find(x=>x.item_id===el.dataset.certOf);
+  if(CL_ON&&el.dataset.certOf&&S&&S.phase==="review"){ const card=(S.matched||[]).find(x=>x.item_id===el.dataset.certOf);
     S.clCert=String(v).replace(/\D+/g,""); S.clGrader=card?graderOf(card):(S.clGrader||"psa"); S.clToast=true;
     const cc=$("#clCert"), cg=$("#clGrader"); if(cc) cc.value=S.clCert; if(cg) cg.value=S.clGrader; lookupCl(); }
   if(el.classList.contains("copyv")){ const icon=el.nextElementSibling&&el.nextElementSibling.classList.contains("copyb")?el.nextElementSibling:null;
@@ -858,7 +878,7 @@ function tile(r){
     else{ const p=pct(r.ev,v), b=isBig(r,v);
       change=`<span class="pill old">${money2(r.ev||0)}</span><span class="dim">→</span><span class="pill new">${money2(v)}</span>${p!=null?`<span class="${b?"pill big":p>=0?"up":"down"}">${p>=0?"+":""}${p}%</span>`:`<span class="pill big">no value</span>`}`; }
   }
-  const facts=[r.last_comp!==undefined?`Last comp <b>${r.last_comp!=null?money2(r.last_comp):"none"}</b>`:"", r.requested_at?`Requested <b>${when(r.requested_at)}</b>`:"", r.cert?`Cert ${copyVal(r.cert,"cert",r.item_id)}${copyBtn(r.cert,"cert",r.item_id)}`:"", r.tag?`Tag <b>${esc(r.tag)}</b>`:"", (r.bin||r.slot)?`Bin <b>${esc(r.bin??"—")}</b> · Slot <b>${esc(r.slot??"—")}</b>`:"", r.status?`Status <b>${esc(r.status)}</b>`:"", evLine(r)].filter(Boolean).join("<br>");
+  const facts=[r.last_comp!==undefined?`Last comp <b>${r.last_comp!=null?money2(r.last_comp):"none"}</b>`:"", r.requested_at?`Requested <b>${when(r.requested_at)}</b>`:"", r.cert?`Cert ${copyVal(r.cert,"cert",r.item_id)}${copyBtn(r.cert,"cert",r.item_id)}`:"", r.tag?`Tag <b>${esc(r.tag)}</b>`:"", r.order_number?`Order ${copyVal(r.order_number,"order number")}${copyBtn(r.order_number,"order number")}`:"", (r.bin||r.slot)?`Bin <b>${esc(r.bin??"—")}</b> · Slot <b>${esc(r.slot??"—")}</b>`:"", r.status?`Status <b>${esc(r.status)}</b>`:"", evLine(r)].filter(Boolean).join("<br>");
   return `<div class="tw"><button type="button" class="infob" data-info="${esc(r.item_id)}" aria-label="Details for ${esc(r.player_name)}" title="Details">i</button><button type="button" class="tile" data-id="${r.item_id}" aria-pressed="${on}" ${S.phase!=="review"?"disabled":""} aria-label="${esc(r.player_name)} ${esc(r.set_name)}">
     <span class="check" aria-hidden="true">${on?"✓":""}</span>
     <div class="slab"><div class="lbl"><span>${esc((r.grade||"").toUpperCase())}</span><span>${r.parallel_total?"/"+esc(r.parallel_total):""}</span></div>
@@ -943,11 +963,11 @@ function showInfo(id){
       ${editable?`<div class="infoedit">
         <label>New EV $<input id="ieEv" inputmode="decimal" value="${esc(o.ev??"")}" placeholder="${S.target!=null?S.target:"0.00"}" aria-label="New estimated value for this card"></label>
         <label>Last comp $<input id="ieLc" inputmode="decimal" value="${esc(o.lc??"")}" placeholder="${r.last_comp!=null?"keep "+money2(r.last_comp).slice(1):S.lastComp!==""&&S.lastComp!=null?S.lastComp:r.last_comp===null?"required":"optional"}" aria-label="Last comp for this card"></label>
-        <label>Cert #<input id="ieCert" inputmode="numeric" value="${esc(r.cert||"")}" aria-label="Cert number for Card Ladder"></label>
-        <label>Grader<select id="ieGr" aria-label="Grading company">${GRADERS.map(([k,l])=>`<option value="${k}" ${k===graderOf(r)?"selected":""}>${l}</option>`).join("")}</select></label>
-        <label>CL Value<span class="clbox" id="ieCl"><span class="note">—</span></span></label>
-        <label>Last sale<span class="clbox" id="ieSale"><span class="note">—</span></span></label>
-        <button class="btn" type="button" id="ieClUse" disabled>Use CL value → EV</button>
+        <label class="clonly">Cert #<input id="ieCert" inputmode="numeric" value="${esc(r.cert||"")}" aria-label="Cert number for Card Ladder"></label>
+        <label class="clonly">Grader<select id="ieGr" aria-label="Grading company">${GRADERS.map(([k,l])=>`<option value="${k}" ${k===graderOf(r)?"selected":""}>${l}</option>`).join("")}</select></label>
+        <label class="clonly">CL Value<span class="clbox" id="ieCl"><span class="note">—</span></span></label>
+        <label class="clonly">Last sale<span class="clbox" id="ieSale"><span class="note">—</span></span></label>
+        <button class="btn clonly" type="button" id="ieClUse" disabled>Use CL value → EV</button>
         <button class="btn primary" type="button" id="ieOk">${idx<list.length-1?"Confirm EV &amp; next ›":"Confirm EV &amp; finish"}</button>
         <div class="small dim" style="flex-basis:100%">${cur!=null&&validTarget(cur)?`Will submit <b>${money2(cur)}</b>${o.ev?"":" (panel value)"} · `:""}Enter = confirm &amp; next · ← → = move (typed values are kept) · Esc = close</div>
       </div>`:""}
@@ -962,7 +982,7 @@ function showInfo(id){
         ${row("Sport",esc(r.sport))}
         ${row("Card number",esc(r.set_number))}${row("Cert",r.cert?copyVal(r.cert,"cert",r.item_id)+copyBtn(r.cert,"cert",r.item_id):"")}${row("AC number",r.ac?copyVal(r.ac,"AC number")+copyBtn(r.ac,"AC number"):"")}
         ${row("Storage",(r.bin||r.slot)?`Bin ${esc(r.bin??"—")} · Slot ${esc(r.slot??"—")}`:"")}
-        ${row("Order",esc(r.order_number))}${row("PO",esc(r.po_number))}
+        ${row("Order",r.order_number?copyVal(r.order_number,"order number")+copyBtn(r.order_number,"order number"):"")}${row("PO",esc(r.po_number))}
         ${row("Purchase cost",r.purchase_cost!=null?money(r.purchase_cost):"")}${row("Bought at",esc(r.purchase_location))}
         ${row("Times sold back",r.times_sold_back!=null?String(r.times_sold_back):"")}
         ${row("Item ID",`<span class="small">${esc(r.item_id)}</span>`)}
@@ -984,7 +1004,7 @@ function showInfo(id){
   const sb=$("#infoSubmit"); if(sb) sb.onclick=()=>{ if(!infoSave(id)) return; d.close(); render(); setTimeout(()=>$("#confirmBtn").click(),50); };
   d.dataset.card=id;
   const ic=$("#ieCert"), ig=$("#ieGr"), iu=$("#ieClUse");
-  if(ic){ ic.onchange=()=>infoCl(id); ig.onchange=()=>infoCl(id);
+  if(ic&&CL_ON){ ic.onchange=()=>infoCl(id); ig.onchange=()=>infoCl(id);
     iu.onclick=()=>{ const ev=$("#ieEv"); if(iu.dataset.v){ ev.value=iu.dataset.v; ev.classList.remove("need","flashbox"); void ev.offsetWidth; ev.classList.add("flashbox"); ev.focus(); } };
     infoCl(id); }
   d.onkeydown=e=>{

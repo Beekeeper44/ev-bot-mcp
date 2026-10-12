@@ -101,3 +101,11 @@ The value can also be typed in the `$` field, or picked with **Use median**, **U
 The panel row is **Estimated value · Last comp · Cert # · Grader · CL Value**. Clicking a cert on a card (the number or ⧉) copies it, fills Cert # and Grader from that card, and looks up its Card Ladder value; **Use CL value → EV** puts it in Estimated value. You can also type a cert and press Enter.
 
 The lookup calls Card Ladder `GET /estimate?cert=…&grader=…` and uses `estimatedValue` only. Set `CARD_LADDER_API_KEY` in Vercel (the URL is built in). If Card Ladder answers 401/403, set `CARD_LADDER_KEY_IN_URL=true` (also sends `?key=`) or `CARD_LADDER_KEY_HEADER` to the header name it expects.
+
+## Card Ladder on / off
+
+The **Card Ladder On · Off** switch next to "Signed in as" picks the layout. **On**: Estimated value · Last comp · Cert # · Grader · CL Value · Last sale (+ the same in the card popup; clicking a cert looks it up). **Off**: the earlier layout — Estimated value and Last comp only, and clicking a cert just copies it. Each person's choice is remembered in their browser.
+
+## Order / PO search
+
+Type `order 1234567` (or `order #1234567`, `ord 1234567, 7654321`) to bring up that order's cards; `po 4386` for a purchase order. Add other words to narrow it (`order 1234567 psa 10`) and the value as usual (`order 1234567 ev 50 lc 48`). Tiles show the order # with a copy button. For speed, paste the updated `sql/4131-warehouse-cards.sql` into 4131 — it adds exact `{{order_number}}` / `{{po_number}}` filters; without them ev-bot still works but has to pull the whole warehouse to find one order.

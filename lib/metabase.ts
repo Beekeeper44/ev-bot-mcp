@@ -18,6 +18,8 @@ export type CardFilters = {
   min_ev_age_days?: number;
   max_ev_age_days?: number;
   min_times_sold_back?: number;
+  order_number?: string; // the card's order # (4131 NUMBER) — exact
+  po_number?: string; // purchase order # (4131 PO_NUMBER) — exact
 };
 
 export type PostFilters = {
@@ -146,6 +148,9 @@ function applyLocal(rows: CardRow[], local: Record<string, unknown>): CardRow[] 
       if (k === "min_ev_age_days") return r.ev_age_days != null && r.ev_age_days >= n(v);
       if (k === "max_ev_age_days") return r.ev_age_days != null && r.ev_age_days <= n(v);
       if (k === "min_times_sold_back") return (r.times_sold_back ?? 0) >= n(v);
+      const bare = (x: unknown) => String(x ?? "").replace(/^#/, "").trim().toLowerCase();
+      if (k === "order_number") return bare(r.order_number) === bare(v);
+      if (k === "po_number") return bare(r.po_number) === bare(v);
       const field = text[k];
       return field ? likeText(r[field], v) : true;
     })
@@ -181,7 +186,7 @@ export function toRow(obj: Record<string, unknown>): CardRow {
     ev_date: s(o.ESTIMATED_VALUE_DATE),
     ev_age_days: n(o.EV_AGE_DAYS),
     ...("EV_DATE_SOURCE" in o ? { ev_source: (s(o.EV_DATE_SOURCE) as "approved" | "task" | null) } : {}),
-    order_number: s(o.NUMBER),
+    order_number: s(o.ORDER_NUMBER ?? o.NUMBER),
     times_sold_back: n(o.TIMES_SOLD_BACK),
     storage_bin_id: s(o.STORAGE_BIN_ID),
     storage_bin_slot: s(o.STORAGE_BIN_SLOT),
