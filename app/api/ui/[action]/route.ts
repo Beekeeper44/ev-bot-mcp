@@ -13,7 +13,7 @@ import { titleSearch, looksLikeTcg } from "@/lib/title";
 import { readEvRange } from "@/lib/evrange";
 import { readOrders } from "@/lib/orders";
 import { lookupCardLadder } from "@/lib/cardladder";
-import { queryCards } from "@/lib/metabase";
+import { queryCards, queryOrderCards } from "@/lib/metabase";
 import { probeEv, openAdminSession, liveEv, type LiveEv } from "@/lib/admin";
 import {
   can, actorOf, currentUser, sessionCookie, clearCookie, signIn, needsSetup, setupFirstAdmin, inviteInfo, acceptInvite,
@@ -162,12 +162,20 @@ export async function POST(req: Request, ctx: Ctx) {
         const tg = pasted ? { tags: [], untagged: false, rest } : readTags(rest);
         // tag only ("tag sd_wemby_grail"): pull the cards with that tag straight from 4131
         const tagOnly = !pasted && (tg.tags.length > 0) && !tg.rest;
-        // order / PO on its own: that order's cards, straight from 4131
-        const orderOnly = !pasted && !tg.tags.length && !tg.rest.trim() && (ord.orders.length + ord.pos.length) > 0;
+        // order #: every card in that order — customers' too — from the orders question (44123);
+        // other words narrow it ("order 1234567 psa 10"). PO on its own: 4131 (warehouse).
+        const byOrder = !pasted && ord.orders.length > 0;
+        const orderOnly = !pasted && !byOrder && !tg.tags.length && !tg.rest.trim() && ord.pos.length > 0;
         // a range on its own (a tab picked, nothing typed): every warehouse card in that range
         const rangeOnly = !orderOnly && !pasted && !tg.tags.length && !tg.untagged && !tg.rest.trim() && Object.keys(rangeF).length > 0;
         const ordF = [...ord.orders.map((o) => ({ order_number: o })), ...ord.pos.map((p) => ({ po_number: p }))];
-        const r0 = orderOnly
+        const r0 = byOrder
+          ? await (async () => { const t0 = Date.now();
+              let rows = (await Promise.all(ord.orders.map((o) => queryOrderCards(o)))).flat();
+              rows = [...new Map(rows.map((x) => [x.item_id, x])).values()];
+              if (tg.rest.trim()) rows = filterTasks(rows as unknown as Parameters<typeof filterTasks>[0], tg.rest).rows as unknown as typeof rows;
+              return { parsed: { filters: { scope: "every card in the order (customers too)" }, post_filters: {} }, has_filter: true, queries: ord.orders.map((o) => ({ __order: o })) as Record<string, unknown>[], ms: Date.now() - t0, rows, missing: [] as string[] }; })()
+          : orderOnly
           ? await (async () => { const t0 = Date.now(); const rows = (await Promise.all(ordF.map((f) => queryCards({ ...f, ...rangeF })))).flat();
               return { parsed: { filters: {}, post_filters: {} }, has_filter: true, queries: ordF, ms: Date.now() - t0, rows: [...new Map(rows.map((x) => [x.item_id, x])).values()], missing: [] as string[] }; })()
           : rangeOnly
@@ -220,6 +228,7 @@ export async function POST(req: Request, ctx: Ctx) {
             times_sold_back: r.times_sold_back, bin: r.storage_bin_id, slot: r.storage_bin_slot,
             purchase_cost: r.purchase_cost, purchase_location: r.purchase_location, po_number: r.po_number, set_number: r.set_number,
             last_comp: r.last_comp,
+            owner: r.owner_email ?? null,
             recent: recent.get(r.item_id) ?? null,
           })),
         });

@@ -16,6 +16,8 @@ export function readEvRange(text: string): { min: number | null; max: number | n
   if (min == null) take(new RegExp(`(?:^|\\s)(?:ev\\s*|value\\s*)?${N}\\s*(?:\\+|or more|or greater|or higher|or above|and up|and above|plus)${EVW}(?=\\s|$)`, "i"), (m) => { min = V(m[1], m[2]); });
   if (min == null) take(new RegExp(`\\b(?:ev\\s*|value\\s*)?(?:over|above|more than|greater than|at least|min(?:imum)?|>=?)\\s*${N}${EVW}`, "i"), (m) => { min = V(m[1], m[2]); });
   if (max == null) take(new RegExp(`\\b(?:ev\\s*|value\\s*)?(?:under|below|less than|at most|max(?:imum)?|up to|<=?)\\s*${N}${EVW}`, "i"), (m) => { max = V(m[1], m[2]); });
-  const y = t.match(/(?:^|\s)((?:19|20)\d\d)(?=\s|$)/);
+  // a lone year — but never a value ("ev 2000", "lc 1950", "$2000", "to 2000", "note …")
+  const noValues = t.replace(/\b(?:ev|lc|last\s*comp|value|estimated value|to|at|=|@|→|->)\s*[:=]?\s*\$?\s*\d[\d,.]*k?/gi, " ").replace(/\$\s*\d[\d,.]*k?/g, " ").replace(/\bnote\b.*$/i, " ");
+  const y = noValues.match(/(?:^|\s)((?:19|20)\d\d)(?=\s|$)/);
   return { min, max, year: y ? y[1] : null, rest: t.replace(/^ | $/g, "").trim() };
 }

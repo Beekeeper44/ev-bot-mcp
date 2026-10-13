@@ -20,6 +20,8 @@ export const config = {
   metabaseHost: () => req("METABASE_HOST").replace(/\/+$/, ""),
   metabaseApiKey: () => req("METABASE_API_KEY"),
   metabaseCardId: () => num("METABASE_CARD_ID", 4131),
+  // order searches ("order 1234567"): every card in the order, customers' too
+  ordersCardId: () => num("EV_ORDERS_CARD_ID", 44123),
 
   // Admin (writes)
   adminApiUrl: () => (process.env.ADMIN_API_URL || "https://admin-api.arenaclub.com").replace(/\/+$/, ""),

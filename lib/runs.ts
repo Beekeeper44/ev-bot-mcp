@@ -5,7 +5,7 @@
 // Every card's previous value is saved before writing, so an approved run can be undone exactly.
 import { randomBytes } from "crypto";
 import { config, validateEv, validateExtras, sameEv, pctChange, type EvExtras } from "./config";
-import { queryCards, queryCardsDetailed, type CardFilters, type CardRow, type PostFilters } from "./metabase";
+import { queryCards, queryCardsDetailed, queryOrderCards, type CardFilters, type CardRow, type PostFilters } from "./metabase";
 import { openAdminSession, readEv, writeEv, approveEv, type EvSnapshot, type EstimateRecord } from "./admin";
 import { can, type Actor } from "./users";
 import { listTasks } from "./tasks";
@@ -228,8 +228,12 @@ export async function runSelection(input: {
   const wanted = [...new Set(input.item_ids)];
   if (!wanted.length) throw new Error("No cards selected.");
   if (wanted.length > config.maxItemsPerRun()) throw new Error(`${wanted.length} cards is over the ${config.maxItemsPerRun()}-card limit.`);
+  // re-check the cards the way they were found: an order search reads the orders question (customers' cards too)
   const fresh = input.queries?.length
-    ? (await Promise.all(input.queries.slice(0, 60).map((f) => queryCards(f, input.post_filters ?? {})))).flat()
+    ? (await Promise.all(input.queries.slice(0, 60).map((f) => {
+        const o = (f as Record<string, unknown>).__order;
+        return o ? queryOrderCards(String(o)) : queryCards(f, input.post_filters ?? {});
+      }))).flat()
     : await queryCards(input.filters, input.post_filters ?? {});
   // every selected card is submitted, including ones already at this value (a fresh estimate is still recorded)
   const byId = new Map(fresh.map((r) => [r.item_id, r]));

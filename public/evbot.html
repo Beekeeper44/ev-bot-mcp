@@ -195,6 +195,9 @@ dialog.info{max-width:760px;width:calc(100% - 32px);padding:0}
 .kindpick{all:unset;box-sizing:border-box;display:flex;justify-content:space-between;gap:12px;width:100%;padding:7px 8px;border-bottom:1px dashed var(--line);cursor:pointer;border-radius:6px}
 .kindpick:hover,.kindpick:focus-visible{background:color-mix(in srgb,var(--go) 12%,transparent);color:var(--go);outline:none}
 .kindpick.did{opacity:.75}
+.dupb{display:inline-block;margin-left:6px;padding:0 6px;border:1px solid var(--warn);border-radius:5px;color:var(--warn);font-size:11px;font-weight:700}
+.gradeb{display:inline-block;margin-left:6px;padding:0 6px;border:1px solid #7cc4ff;border-radius:5px;color:#7cc4ff;font-size:11px;font-weight:700}
+.dupsum{font-size:12px;color:var(--text)}
 .infonav{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px}
 /* popup edit box, in pairs: New EV | Last comp · Cert # | Grader · CL Value | Last sale · Use CL | Confirm */
 .infoedit{display:grid;grid-template-columns:1fr 1fr;gap:8px 10px;align-items:end;margin:10px 0 12px;padding:10px;border:1px solid var(--go);border-radius:10px;background:color-mix(in srgb,var(--go) 7%,transparent)}
@@ -209,7 +212,34 @@ dialog.info{max-width:760px;width:calc(100% - 32px);padding:0}
 .infoedit input.need{border-color:var(--warn)}
 .sortpick{margin-left:auto;display:flex;gap:6px;align-items:center}
 .sortpick select{padding:4px 8px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--text);font:inherit;font-size:12px}
-.age-new{color:var(--go)}.age-old{color:var(--warn)}
+.owner-cust{color:#7cc4ff}
+.arenanote{font-size:11px;color:#7cc4ff}
+.tileedit{flex-wrap:wrap}
+.arenaev{white-space:nowrap;font-size:12px;color:#7cc4ff;flex-basis:100%;order:3;text-align:right}
+.arenaev b{font-size:14px;color:var(--go)}
+.arenapanel{margin-top:8px;padding:7px 10px;border:1px solid #7cc4ff;border-radius:8px;font-size:12.5px;color:#cfe8ff;background:rgba(124,196,255,.07)}
+.artbl{width:100%;border-collapse:collapse;font-size:13px}.artbl th,.artbl td{text-align:left;padding:5px 8px;border-bottom:1px solid var(--line)}
+.setno{color:var(--text);font-weight:700}
+.age-new{color:var(--go)}
+/* Arena Club slab */
+.aslab{border-radius:10px;padding:6px;background:linear-gradient(160deg,#e9ece9,#c9cfcb 45%,#f4f6f4);border:1px solid #b9c0bb;display:flex;flex-direction:column;gap:6px;aspect-ratio:3/4.1;box-sizing:border-box}
+.tw .aslab{padding-top:30px}
+.alabel{background:#121212;color:#fff;border-radius:4px;padding:5px 7px;display:flex;flex-direction:column;gap:3px}
+.al-top{display:flex;justify-content:space-between;align-items:flex-start;gap:6px}
+.al-player{font-size:9.5px;font-weight:800;letter-spacing:.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.al-logo{font-size:9px;font-weight:900;letter-spacing:.08em;line-height:1;text-align:right;flex:none}
+.al-logo span{display:block;font-size:5.5px;letter-spacing:.3em;font-weight:700;color:#bdbdbd}
+.al-body{display:flex;gap:8px;align-items:center}
+.al-gr{flex:none;text-align:center}
+.al-g{font-size:24px;font-weight:900;line-height:1}
+.al-w{font-size:6.5px;font-weight:700;letter-spacing:.06em;color:#cfcfcf;white-space:nowrap}
+.al-m{font-size:8px;line-height:1.3;color:#e6e6e6;min-width:0}
+.al-m div{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.al-ac{font-size:6.5px;color:#bdbdbd;letter-spacing:.06em;text-align:right}
+.acard{flex:1;border-radius:4px;background:linear-gradient(150deg,#3b3b3b,#151515);display:grid;place-items:center;color:rgba(255,255,255,.55);font-weight:900;font-size:30px;border:1px solid #9aa19c}
+.aslab.big{max-width:320px;margin:0 auto}
+.aslab.big .al-player{font-size:13px}.aslab.big .al-g{font-size:36px}.aslab.big .al-w{font-size:9px}
+.aslab.big .al-m{font-size:11.5px}.aslab.big .al-logo{font-size:13px}.aslab.big .al-logo span{font-size:7.5px}.aslab.big .al-ac{font-size:9px}.aslab.big .acard{font-size:56px}
 .didb{display:inline-block;margin-right:8px;padding:0 6px;border:1px solid var(--go);border-radius:5px;color:var(--go);font-size:11px;font-weight:700}
 .kindpick.on{background:color-mix(in srgb,var(--go) 18%,transparent);color:var(--go);font-weight:700}
 .versions .focusbar{margin-top:0}
@@ -317,7 +347,8 @@ dialog .acts{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}
 <div class="wrap">
   <div class="top">
     <div class="titlerow"><h1>EV <span>Bot</span></h1>
-      <span class="seg clmode" role="group" aria-label="Card Ladder"><span class="dim small">Card Ladder</span><button type="button" data-cl="on" aria-pressed="true">On</button><button type="button" data-cl="off" aria-pressed="false">Off</button></span></div>
+      <span class="seg clmode" role="group" aria-label="Card Ladder"><span class="dim small">Card Ladder</span><button type="button" data-cl="on" aria-pressed="true">On</button><button type="button" data-cl="off" aria-pressed="false">Off</button></span>
+      <span class="seg clmode armode" role="group" aria-label="Arena pricing"><span class="dim small">Arena = % of PSA</span><button type="button" data-ar="on" aria-pressed="true">On</button><button type="button" data-ar="off" aria-pressed="false">Off</button><button type="button" class="btn link" id="arRules" style="padding:0 4px">rules</button></span></div>
     <nav class="tabs" role="tablist" aria-label="Sections">
       <button role="tab" id="tabBtn-request" aria-selected="true" aria-controls="tab-request" type="button">Request <span class="badge-n" id="taskCount" hidden></span></button>
       <button role="tab" id="tabBtn-approve" aria-selected="false" aria-controls="tab-approve" type="button">Approve <span class="badge-n" id="apprCount" hidden></span></button>
@@ -331,7 +362,7 @@ dialog .acts{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}
   <section id="tab-request" role="tabpanel" aria-labelledby="tabBtn-request">
     <div class="source live" id="source">
       <div><span class="dim">Cards:</span>
-        <b>All warehouse cards · Metabase 4131, fresh every search</b>
+        <b id="srcLabel">All warehouse cards · Metabase 4131, fresh every search</b>
         <span class="dim" id="srcCount"></span> <span class="mode" id="modeBadge"></span></div>
       <div class="srcacts">
         <span class="dim small" id="whoami"></span>
@@ -584,10 +615,20 @@ let CL_ON=true; try{ CL_ON=localStorage.getItem("evbot_cl")!=="off"; }catch{}
 function setClMode(on){
   CL_ON=on; try{ localStorage.setItem("evbot_cl",on?"on":"off"); }catch{}
   document.body.classList.toggle("cl-off",!on);
-  document.querySelectorAll(".clmode button").forEach(b=>b.setAttribute("aria-pressed",String((b.dataset.cl==="on")===on)));
+  document.querySelectorAll(".clmode button[data-cl]").forEach(b=>b.setAttribute("aria-pressed",String((b.dataset.cl==="on")===on)));
   if(S&&S.phase==="review") render();
 }
-document.querySelectorAll(".clmode button").forEach(b=>b.onclick=()=>setClMode(b.dataset.cl==="on"));
+document.querySelectorAll(".clmode button[data-cl]").forEach(b=>b.onclick=()=>setClMode(b.dataset.cl==="on"));
+function setArenaMode(on){ ARENA_ON=on; try{ localStorage.setItem("evbot_arena",on?"on":"off"); }catch{}
+  document.querySelectorAll(".armode button[data-ar]").forEach(b=>b.setAttribute("aria-pressed",String((b.dataset.ar==="on")===on)));
+  if(S&&S.phase==="review") render(); }
+document.querySelectorAll(".armode button[data-ar]").forEach(b=>b.onclick=()=>setArenaMode(b.dataset.ar==="on"));
+setTimeout(()=>setArenaMode(ARENA_ON),0);
+document.getElementById("arRules").onclick=()=>ask({title:"Arena Club pricing",
+  body:`For Arena Club slabs, type the <b>PSA-equivalent price</b>. ev-bot submits that price × the Arena factor (whole dollars).<br><br>
+  <table class="artbl"><tr><th>Arena grade</th><th>Priced off</th><th>Arena EV</th><th>e.g. PSA $1,000</th></tr>
+  ${ARENA_RULES.map(([g,[p,f]])=>`<tr><td>Arena ${g}</td><td>${p}</td><td>${Math.round(f*100)}%</td><td>${money2(Math.floor(1000*f+0.5))}</td></tr>`).join("")}
+  <tr><td>Arena 6.5 and below</td><td>same PSA grade</td><td>100%</td><td>$1,000</td></tr></table>`,yes:"OK"});
 document.body.classList.toggle("cl-off",!CL_ON);
 setTimeout(()=>setClMode(CL_ON),0);
 /* Card Ladder: cert # + grader → CL Value; "Use CL value → EV" fills the estimated value.
@@ -655,7 +696,7 @@ function recentOf(rows,k){
 const recentBadge=d=>`<span class="didb" title="${d.n} ${d.n===1?"card":"cards"}${d.by.length?" · by "+esc(d.by.join(", ")):""} · shows for ${RECENT_DAYS} days">✓ ${d.approved?"approved":"submitted"} ${d.vals.slice(0,3).map(v=>money2(v)).join(", ")} · ${dayOf(d.at)}</span>`;
 async function find(text,opts={}){
   requestAnimationFrame(()=>{const i=$("#input");i.style.height="auto";i.style.height=Math.min(i.scrollHeight+2,200)+"px"});
-  if(!text.trim()&&SCOPE!=="tasks"&&BAND==="all") return;
+  if(!text.trim()&&SCOPE!=="tasks") return; // cards only load for a typed search
   const seq=++findSeq;
   const ex=readExtras(text);
   $("#empty").hidden=false; $("#empty").innerHTML=`<span class="spin"></span>${SCOPE==="tasks"?"Pulling cards waiting for an estimate…":"Searching Metabase 4131…"}`; $("#summary").innerHTML=""; $("#grid").innerHTML=""; $("#bar").hidden=true;
@@ -668,6 +709,8 @@ async function find(text,opts={}){
   const at=new Date().toLocaleTimeString([], {hour:"numeric",minute:"2-digit",second:"2-digit"});
   $("#srcCount").textContent=res.scope==="tasks"?`· ${res.total.toLocaleString()} of ${res.task_total.toLocaleString()} waiting · pulled ${at}`:`· ${res.total.toLocaleString()} matching · pulled ${at} (${(res.ms/1000).toFixed(1)}s)`;
   if(res.scope==="tasks"){ window.TASK_OPEN=res.task_total; refreshCounts(); }
+  { const lbl=$("#srcLabel"); const byOrder=!!(res.parsed&&res.parsed.filters&&res.parsed.filters.scope);
+    if(lbl) lbl.textContent=byOrder?"Every card in the order (customers too) · orders question, fresh every search":"All warehouse cards · Metabase 4131, fresh every search"; }
   if(!res.has_filter){ showEmpty("Add at least one filter: a player, set, parallel, grade, value range, AC number or cert number."); return; }
   const p=res.parsed;
   const keep=S&&S.target!=null&&res.target_ev==null?S.target:null; // keep a value already entered when only the cards change
@@ -705,7 +748,16 @@ function scheduleCopies(){
     S.copiesKey=key; S.copiesLoading=false; if(S.phase==="review") render(); },400);
 }
 /* per-card value: what's typed on the tile, else the panel value */
-const evOf=r=>{const o=S.over.get(r.item_id); return o&&o.ev!==""&&o.ev!=null?num(o.ev):S.target};
+/* Arena pricing: for Arena Club slabs the value you type is the PSA-equivalent price, and the EV submitted is
+   that price × the Arena factor for the grade (whole dollars, .50 rounds up). Switch: "Arena = % of PSA". */
+const ARENA_RULES=[ // arena grade → [priced off PSA, factor]
+  ["10",["PSA 10",0.65]],["9.5",["PSA 9",1]],["9",["PSA 9",0.85]],["8.5",["PSA 8",1]],["8",["PSA 8",0.90]],["7.5",["PSA 7",1]],["7",["PSA 7",1]]];
+const ARENA_MAP=new Map(ARENA_RULES);
+let ARENA_ON=true; try{ ARENA_ON=localStorage.getItem("evbot_arena")!=="off"; }catch{}
+function arenaRule(r){ if(!ARENA_ON||!isArena(r)) return null; const g=String(r.grade||"").trim().split(/\s+/).pop()||""; return ARENA_MAP.get(g)||[`PSA ${g}`,1]; }
+const baseOf=r=>{const o=S.over.get(r.item_id); return o&&o.ev!==""&&o.ev!=null?num(o.ev):S.target};
+const evOf=r=>{ const b=baseOf(r); if(b==null) return null; const ar=arenaRule(r); return ar?Math.floor(b*ar[1]+0.5):b; };
+const arenaNote=r=>{ const ar=arenaRule(r), b=baseOf(r); if(!ar||b==null) return ""; return `${ar[0]} ${money2(b)}${ar[1]!==1?` × ${Math.round(ar[1]*100)}%`:""}`; };
 const lcOf=r=>{const o=S.over.get(r.item_id); return o&&o.lc!==""&&o.lc!=null?o.lc:S.lastComp};
 const lcMissing=r=>r.last_comp===null&&(lcOf(r)===""||lcOf(r)==null);
 const cardReady=r=>{const v=evOf(r); return v!=null&&validTarget(v)&&!lcMissing(r)&&(lcOf(r)===""||lcOf(r)==null||isMoney(lcOf(r)))};
@@ -740,6 +792,9 @@ function render(){
         <label class="clonly"><span class="lt" title="Card Ladder's last sale for this cert; red when it's over 7 days old">Last sale</span><span class="clbox" id="clSale">${clSaleHtml(S.clLastSale)}</span></label>
       </div>
       ${S.scope==="tasks"?`<label class="tog" style="margin:8px 0 2px"><input type="checkbox" id="cpIn" ${S.withCopies?"checked":""} ${locked?"disabled":""}><span><b>Also update every copy</b> in the warehouse (same set, card #, parallel, grade) — replaces their EV <span class="dim" id="cpN">${copyNote()}</span></span></label>`:""}
+      ${!locked&&ARENA_ON&&S.target!=null&&validTarget(S.target)&&sel.some(r=>arenaRule(r))?(()=>{
+        const gs=[...new Set(sel.filter(r=>arenaRule(r)).map(r=>String(r.grade||"").trim().split(/\s+/).pop()))].sort((a,b)=>b-a);
+        return `<div class="arenapanel">Arena slabs: the price above is the PSA price. They submit ${gs.map(g=>{const ar=ARENA_MAP.get(g)||[`PSA ${g}`,1]; return `<b>Arena ${esc(g)} → ${money2(Math.floor(S.target*ar[1]+0.5))}</b> <span class="dim">(${esc(ar[0])} × ${Math.round(ar[1]*100)}%)</span>`;}).join(" · ")}</div>`; })():""}
       <div class="evform evurl">
         <label>URL (optional)<input id="urlIn" type="url" value="${esc(S.url)}" placeholder="https://www.ebay.com/itm/…" ${locked?"disabled":""}></label>
       </div>
@@ -767,15 +822,25 @@ function render(){
       // every version of the card in this search (range tab applied), whether or not one is picked
       const base=(S.scope==="tasks"?S.matched:needsChange(S.matched,S.target)).filter(r=>BAND==="all"||inBand(r,BAND));
       const cnt=new Map(); base.forEach(r=>{const k=cardKey(r); cnt.set(k,(cnt.get(k)||0)+1);});
+      // same card (set · player · # · parallel) across grades, and duplicates (same card + grade more than once)
+      const cardOnly=r=>[r.set_name,r.player_name,r.set_number?"#"+r.set_number:"",r.parallel_name||"base"].filter(Boolean).join(" · ");
+      const gradeOf=r=>(r.grade||"").toUpperCase().replace("ARENA_CLUB","ARENA");
+      const byCard=new Map(), kOf=new Map();
+      base.forEach(r=>{const c=cardOnly(r), k=cardKey(r); kOf.set(k,{c,g:gradeOf(r)}); if(!byCard.has(c)) byCard.set(c,new Map()); const m=byCard.get(c); m.set(gradeOf(r),(m.get(gradeOf(r))||0)+1);});
+      const dupVersions=[...cnt].filter(([,n])=>n>1), multiGrade=[...byCard].filter(([,m])=>m.size>1);
+      const otherGrades=k=>{const x=kOf.get(k); if(!x) return []; return [...byCard.get(x.c)].filter(([g])=>g!==x.g);};
       if(cnt.size<2&&!S.kind) return "";
-      const order=[...cnt.keys()].sort((a,b)=>cnt.get(b)-cnt.get(a));
+      // same card's grades sit together: groups by total copies, then best grade first inside a group
+      const gnum=k=>{const x=kOf.get(k); return x?Number(String(x.g).split(" ").pop())||0:0;};
+      const tot=c=>[...byCard.get(c).values()].reduce((a,n)=>a+n,0);
+      const order=[...cnt.keys()].sort((a,b)=>{const ca=(kOf.get(a)||{}).c, cb=(kOf.get(b)||{}).c; if(ca!==cb) return (tot(cb)-tot(ca))||String(ca).localeCompare(String(cb)); return gnum(b)-gnum(a);});
       const selN=k=>sel.filter(r=>cardKey(r)===k).length;
       const open=!S.kind||S.kindOpen;
       return `<div class="warn versions">
         ${S.kind
           ?`<div class="focusbar"><button class="btn" type="button" id="kindAll">← Back to all ${cnt.size} versions</button><span>Showing only <b>${esc(S.kind)}</b> · ${S.rows.length} ${S.rows.length===1?"copy":"copies"}</span><button class="btn link" type="button" id="kindToggle">${open?"Hide list":"Pick another version"}</button></div>`
-          :`<b>${cnt.size} different versions of this card matched.</b>${(()=>{const n=[...cnt.keys()].filter(k=>recentOf(base,k)).length; return n?` <span class="didb">✓ ${n} done in the last ${RECENT_DAYS} days</span>`:"";})()} Click one to work on only those copies — or keep them all and they all get the panel value (type on a tile for a different one).`}
-        ${open?`<ul class="taglist kinds">${S.kind?`<li><button type="button" class="kindpick" data-kind=""><span>← All versions</span><span>${base.length}</span></button></li>`:""}${order.map(k=>`<li><button type="button" class="kindpick ${k===S.kind?"on":""} ${recentOf(base,k)?"did":""}" data-kind="${esc(k)}" aria-pressed="${k===S.kind}"><span>${recentOf(base,k)?recentBadge(recentOf(base,k))+" ":""}${esc(k)}</span><span>${!S.kind&&selN(k)!==cnt.get(k)?`${selN(k)} of ${cnt.get(k)}`:cnt.get(k)}</span></button></li>`).join("")}</ul>`:""}
+          :`<b>${cnt.size} different versions of this card matched.</b>${dupVersions.length||multiGrade.length?` <span class="dupsum">${dupVersions.length?`<b>${dupVersions.reduce((a,[,n])=>a+n,0)}</b> cards are duplicates (${dupVersions.length} ${dupVersions.length===1?"version":"versions"} with 2+ copies)`:""}${dupVersions.length&&multiGrade.length?" · ":""}${multiGrade.length?`<b>${multiGrade.length}</b> ${multiGrade.length===1?"card is":"cards are"} in more than one grade`:""}.</span>`:""}${(()=>{const n=[...cnt.keys()].filter(k=>recentOf(base,k)).length; return n?` <span class="didb">✓ ${n} done in the last ${RECENT_DAYS} days</span>`:"";})()} Click one to work on only those copies — or keep them all and they all get the panel value (type on a tile for a different one).`}
+        ${open?`<ul class="taglist kinds">${S.kind?`<li><button type="button" class="kindpick" data-kind=""><span>← All versions</span><span>${base.length}</span></button></li>`:""}${order.map(k=>`<li><button type="button" class="kindpick ${k===S.kind?"on":""} ${recentOf(base,k)?"did":""}" data-kind="${esc(k)}" aria-pressed="${k===S.kind}"><span>${recentOf(base,k)?recentBadge(recentOf(base,k))+" ":""}${esc(k)}${cnt.get(k)>1?` <span class="dupb" title="${cnt.get(k)} copies of this card in this grade">${cnt.get(k)} copies</span>`:""}${otherGrades(k).length?` <span class="gradeb" title="The same card in other grades">also ${otherGrades(k).map(([g,n])=>`${esc(g)}${n>1?" ×"+n:""}`).join(", ")}</span>`:""}</span><span>${!S.kind&&selN(k)!==cnt.get(k)?`${selN(k)} of ${cnt.get(k)}`:cnt.get(k)}</span></button></li>`).join("")}</ul>`:""}
       </div>`; })()||""}
     ${big.length&&!locked?`<div class="warn"><b>${big.length} ${big.length===1?"card moves":"cards move"} more than ${window.BIG_PCT||50}%</b> (or had no value). They're marked on the tiles. Double-check them before submitting.</div>`:""}
   </div>`;
@@ -817,6 +882,7 @@ async function copyText(el){
   if(el.classList.contains("copyv")){ const icon=el.nextElementSibling&&el.nextElementSibling.classList.contains("copyb")?el.nextElementSibling:null;
     el.classList.add("flash"); setTimeout(()=>el.classList.remove("flash"),900); if(icon) el=icon; }
   try{ await navigator.clipboard.writeText(v); ok=true; }catch{ const t=document.createElement("textarea"); t.value=v; document.body.appendChild(t); t.select(); try{ok=document.execCommand("copy")}catch{} t.remove(); }
+  if(ok&&el.dataset.copyKind==="card") toast(`Copied <b>${esc(v)}</b>`);
   el.textContent=ok?"✓":"!"; el.classList.add("done"); setTimeout(()=>{el.textContent="⧉"; el.classList.remove("done")},1200);
 }
 const copyTarget=e=>(e.target.closest&&e.target.closest("[data-copy]"))||((document.elementFromPoint(e.clientX,e.clientY)||{}).closest?.("[data-copy]"))||null;
@@ -859,6 +925,34 @@ function evLine(r){
   if(r.ev_source===null) return `EV age <b>—</b> · never approved`;
   return r.ev_age_days!=null?`EV age ${ageTag(r.ev_age_days)}`:"";
 }
+/* Arena Club slab: drawn from the card's data when there's no slab photo (and in the popup) */
+const isArena=r=>/arena/i.test(String(r.grading_company||String(r.grade||"").split(" ")[0]||""));
+const GRADE_WORD={"10":"GEM MINT","9.5":"MINT+","9":"MINT","8.5":"NM-MT+","8":"NM-MT","7.5":"NM+","7":"NM","6.5":"EX-MT+","6":"EX-MT","5":"EX","4":"VG-EX","3":"VG","2":"GOOD","1.5":"FAIR","1":"POOR"};
+const acLabel=ac=>ac?"8AC"+String(ac).replace(/\D/g,"").padStart(9,"0"):"";
+function arenaSlab(r,big){
+  const g=String(r.grade||"").trim().split(/\s+/).pop()||"";
+  const num=r.set_number?"#"+String(r.set_number).replace(/^#/,""):"";
+  const lines=[r.set_name,r.insert,num,r.parallel_name].filter(Boolean);
+  return `<div class="aslab ${big?"big":""}" title="Arena Club slab">
+    <div class="alabel">
+      <div class="al-top"><span class="al-player">${esc(String(r.player_name||"").toUpperCase())}</span><span class="al-logo">ARENA<span>CLUB</span></span></div>
+      <div class="al-body"><div class="al-gr"><div class="al-g">${esc(g)}</div><div class="al-w">${esc(GRADE_WORD[g]||"")}</div></div>
+        <div class="al-m">${lines.map(l=>`<div>${esc(l)}</div>`).join("")}</div></div>
+      <div class="al-ac">${esc(acLabel(r.ac))}</div>
+    </div>
+    <div class="acard"><span>${esc(String(r.player_name||"").split(/[\s.]+/).filter(Boolean).slice(0,2).map(w=>w[0]).join("").toUpperCase())}</span></div>
+  </div>`;
+}
+/* clicking the AC number copies the card as a search line, graded as PSA with the same grade:
+   "2024 Panini Prizm WNBA Caitlin Clark #22 Silver PSA 10" */
+function cardLine(r){
+  let g=String(r.grade||"").trim().split(/\s+/).pop()||"";
+  // Arena Club half grades go down to the PSA whole grade: Arena 9.5 → PSA 9, Arena 8.5 → PSA 8
+  if(isArena(r)&&/^\d+\.5$/.test(g)) g=String(Math.floor(Number(g)));
+  const num=r.set_number?"#"+String(r.set_number).replace(/^#/,""):"";
+  return [r.set_name,r.insert,r.player_name,num,r.parallel_name,g?"PSA "+g:""].filter(Boolean).join(" ").replace(/\s{2,}/g," ").trim();
+}
+const acCopy=(r,big)=>r.ac?`<span class="copyv" data-copy="${esc(cardLine(r))}" data-copy-kind="card" title="Copy: ${esc(cardLine(r))}">${esc(r.ac)}</span><span class="copyb" role="button" tabindex="0" data-copy="${esc(cardLine(r))}" data-copy-kind="card" title="Copy: ${esc(cardLine(r))}" aria-label="Copy card line">⧉</span>`:"";
 function tile(r){
   const on=S.selected.has(r.item_id);
   const h=HUE[r.player_name]??[...r.player_name].reduce((a,c)=>(a*31+c.charCodeAt(0))%360,7);
@@ -876,22 +970,23 @@ function tile(r){
     const v=evOf(r);
     if(v==null||!validTarget(v)) change=`<span class="dim">Enter a value</span>`;
     else{ const p=pct(r.ev,v), b=isBig(r,v);
-      change=`<span class="pill old">${money2(r.ev||0)}</span><span class="dim">→</span><span class="pill new">${money2(v)}</span>${p!=null?`<span class="${b?"pill big":p>=0?"up":"down"}">${p>=0?"+":""}${p}%</span>`:`<span class="pill big">no value</span>`}`; }
+      change=`${arenaNote(r)?`<div class="arenanote">${esc(arenaNote(r))} =</div>`:""}<span class="pill old">${money2(r.ev||0)}</span><span class="dim">→</span><span class="pill new">${money2(v)}</span>${p!=null?`<span class="${b?"pill big":p>=0?"up":"down"}">${p>=0?"+":""}${p}%</span>`:`<span class="pill big">no value</span>`}`; }
   }
-  const facts=[r.last_comp!==undefined?`Last comp <b>${r.last_comp!=null?money2(r.last_comp):"none"}</b>`:"", r.requested_at?`Requested <b>${when(r.requested_at)}</b>`:"", r.cert?`Cert ${copyVal(r.cert,"cert",r.item_id)}${copyBtn(r.cert,"cert",r.item_id)}`:"", r.tag?`Tag <b>${esc(r.tag)}</b>`:"", r.order_number?`Order ${copyVal(r.order_number,"order number")}${copyBtn(r.order_number,"order number")}`:"", (r.bin||r.slot)?`Bin <b>${esc(r.bin??"—")}</b> · Slot <b>${esc(r.slot??"—")}</b>`:"", r.status?`Status <b>${esc(r.status)}</b>`:"", evLine(r)].filter(Boolean).join("<br>");
+  const facts=[r.last_comp!==undefined?`Last comp <b>${r.last_comp!=null?money2(r.last_comp):"none"}</b>`:"", r.requested_at?`Requested <b>${when(r.requested_at)}</b>`:"", r.cert?`Cert ${copyVal(r.cert,"cert",r.item_id)}${copyBtn(r.cert,"cert",r.item_id)}`:"", r.owner?`Owner <b class="${/arenaclub|slabpacks/i.test(r.owner)?"":"owner-cust"}">${esc(r.owner)}</b>`:"", r.tag?`Tag <b>${esc(r.tag)}</b>`:"", r.order_number?`Order ${copyVal(r.order_number,"order number")}${copyBtn(r.order_number,"order number")}`:"", (r.bin||r.slot)?`Bin <b>${esc(r.bin??"—")}</b> · Slot <b>${esc(r.slot??"—")}</b>`:"", r.status?`Status <b>${esc(r.status)}</b>`:"", evLine(r)].filter(Boolean).join("<br>");
   return `<div class="tw"><button type="button" class="infob" data-info="${esc(r.item_id)}" aria-label="Details for ${esc(r.player_name)}" title="Details">i</button><button type="button" class="tile" data-id="${r.item_id}" aria-pressed="${on}" ${S.phase!=="review"?"disabled":""} aria-label="${esc(r.player_name)} ${esc(r.set_name)}">
     <span class="check" aria-hidden="true">${on?"✓":""}</span>
-    <div class="slab"><div class="lbl"><span>${esc((r.grade||"").toUpperCase())}</span><span>${r.parallel_total?"/"+esc(r.parallel_total):""}</span></div>
-      <div class="art" style="background:linear-gradient(150deg,hsl(${h} 55% 38%),hsl(${(h+40)%360} 60% 22%))">${esc(initials)}${r.img?`<img src="${esc(r.img)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">`:""}</div></div>
+    ${isArena(r)&&!r.img?arenaSlab(r):`<div class="slab"><div class="lbl"><span>${esc((r.grade||"").toUpperCase())}</span><span>${r.parallel_total?"/"+esc(r.parallel_total):""}</span></div>
+      <div class="art" style="background:linear-gradient(150deg,hsl(${h} 55% 38%),hsl(${(h+40)%360} 60% 22%))">${esc(initials)}${r.img?`<img src="${esc(r.img)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">`:""}</div></div>`}
     <div class="name">${esc(r.player_name)}</div>
-    <div class="meta">${esc(r.set_name)}${r.insert?" · "+esc(r.insert):""}${r.parallel_name?"<br>"+esc(r.parallel_name):""}</div>
-    <div class="row"><span class="dim">AC ${copyVal(r.ac,"AC number")}${copyBtn(r.ac,"AC number")}</span><span class="ev">${money2(r.ev)}</span></div>
+    <div class="meta">${esc(r.set_name)}${r.insert?" · "+esc(r.insert):""}${r.set_number?` · <b class="setno">#${esc(String(r.set_number).replace(/^#/,""))}</b>`:""}${r.parallel_name?"<br>"+esc(r.parallel_name):""}</div>
+    <div class="row"><span class="dim">AC ${acCopy(r)}</span><span class="ev">${money2(r.ev)}</span></div>
     ${facts?`<div class="facts">${facts}</div>`:""}
     ${S.scope==="tasks"&&S.phase==="review"&&copiesOf(r.item_id).length?`<div class="small" style="color:var(--go);font-weight:700">+${copiesOf(r.item_id).length} ${copiesOf(r.item_id).length===1?"copy":"copies"} in the warehouse (now ${[...new Set(copiesOf(r.item_id).map(c=>money2(c.ev)))].slice(0,3).join(", ")})</div>`:""}
     ${r.pending&&S.phase==="review"?`<div class="pend">Already in Approve at ${money2(r.pending.ev)} (by ${esc(r.pending.by)})</div>`:""}
     <div class="tagchange">${change}</div>
   </button>${S.phase==="review"&&on&&ME&&ME.can_write?(()=>{const o=S.over.get(r.item_id)||{}; return `<div class="tileedit" data-for="${esc(r.item_id)}">
-    <label>EV $<input data-te="ev" inputmode="decimal" value="${esc(o.ev??"")}" placeholder="${S.target!=null?money2(S.target).slice(1):""}" aria-label="This card's estimated value"></label>
+    <label title="${arenaRule(r)?`Arena slab: type the ${esc(arenaRule(r)[0])} price`:""}">${arenaRule(r)?esc(arenaRule(r)[0].replace("PSA ","PSA")):"EV"} $<input data-te="ev" inputmode="decimal" value="${esc(o.ev??"")}" placeholder="${S.target!=null?money2(S.target).slice(1):""}" aria-label="${arenaRule(r)?`This card's ${esc(arenaRule(r)[0])} price`:"This card's estimated value"}"></label>
+    ${arenaRule(r)?`<span class="arenaev" data-aev="${esc(r.item_id)}" title="EV that will be submitted for this Arena slab">EV <b>${evOf(r)!=null?money2(evOf(r)):"—"}</b></span>`:""}
     <label>LC $<input data-te="lc" inputmode="decimal" class="${lcMissing(r)?"need":""}" value="${esc(o.lc??"")}" placeholder="${r.last_comp!=null?"keep "+money2(r.last_comp).slice(1):S.lastComp!==""&&S.lastComp!=null?S.lastComp:r.last_comp===null?"required":"optional"}" aria-label="This card's last comp"></label></div>`})():""}</div>`;
 }
 function bindTiles(){
@@ -900,8 +995,9 @@ function bindTiles(){
     box.querySelectorAll("input[data-te]").forEach(inp=>{
       inp.oninput=()=>{ const o=S.over.get(id)||{}; o[inp.dataset.te]=inp.value.replace(/[$,\s]/g,""); S.over.set(id,o);
         const tw=box.closest(".tw"), tc=tw.querySelector(".tagchange"); const v=evOf(r);
-        tc.innerHTML=v==null||!validTarget(v)?`<span class="dim">Enter a value</span>`:`<span class="pill old">${money2(r.ev||0)}</span><span class="dim">→</span><span class="pill new">${money2(v)}</span>`;
+        tc.innerHTML=v==null||!validTarget(v)?`<span class="dim">Enter a value</span>`:`${arenaNote(r)?`<div class="arenanote">${esc(arenaNote(r))} =</div>`:""}<span class="pill old">${money2(r.ev||0)}</span><span class="dim">→</span><span class="pill new">${money2(v)}</span>`;
         const lci=box.querySelector('input[data-te="lc"]'); lci.classList.toggle("need",lcMissing(r));
+        const aev=box.querySelector("[data-aev]"); if(aev) aev.innerHTML=`EV <b>${v!=null&&validTarget(v)?money2(v):"—"}</b>`;
         const sel=S.rows.filter(x=>S.selected.has(x.item_id)); renderBar(sel.length,sel.filter(x=>evOf(x)!=null&&validTarget(evOf(x))&&isBig(x,evOf(x))).length); };
       inp.onkeydown=ev=>{ if(ev.key!=="Enter") return; ev.preventDefault(); const all=[...document.querySelectorAll(`.tileedit input[data-te="${inp.dataset.te}"]`)]; const nx=all[all.indexOf(inp)+1]; if(nx){nx.focus();nx.select();} };
     });
@@ -956,20 +1052,20 @@ function showInfo(id){
       <button class="btn" type="button" id="infoNext" ${idx>=list.length-1?"disabled":""} aria-label="Next card">Next ›</button>
     </div>
     <div class="in">
-    <div class="pic">${r.img?`<img src="${esc(r.img)}" alt="Slab photo" referrerpolicy="no-referrer" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'dim small',textContent:'Photo unavailable'}))">`:`<span class="dim small">No photo</span>`}</div>
+    <div class="pic">${!r.img&&isArena(r)?arenaSlab(r,true):r.img?`<img src="${esc(r.img)}" alt="Slab photo" referrerpolicy="no-referrer" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'dim small',textContent:'Photo unavailable'}))">`:`<span class="dim small">No photo</span>`}</div>
     <div>
       <h2>${esc(r.player_name)}</h2>
       <div class="dim small">${esc(r.set_name)}${r.insert?" · "+esc(r.insert):""}${r.parallel_name?" · "+esc(r.parallel_name):""}${r.parallel_total?" /"+esc(r.parallel_total):""}</div>
       ${editable?`<div class="infoedit">
-        <label>New EV $<input id="ieEv" inputmode="decimal" value="${esc(o.ev??"")}" placeholder="${S.target!=null?S.target:"0.00"}" aria-label="New estimated value for this card"></label>
+        <label>${arenaRule(r)?`New EV $ <span class="arenanote" style="font-weight:400">· enter the ${esc(arenaRule(r)[0])} price</span>`:"New EV $"}<input id="ieEv" inputmode="decimal" value="${esc(o.ev??"")}" placeholder="${S.target!=null?S.target:"0.00"}" aria-label="New estimated value for this card"></label>
         <label>Last comp $<input id="ieLc" inputmode="decimal" value="${esc(o.lc??"")}" placeholder="${r.last_comp!=null?"keep "+money2(r.last_comp).slice(1):S.lastComp!==""&&S.lastComp!=null?S.lastComp:r.last_comp===null?"required":"optional"}" aria-label="Last comp for this card"></label>
-        <label class="clonly">Cert #<input id="ieCert" inputmode="numeric" value="${esc(r.cert||"")}" aria-label="Cert number for Card Ladder"></label>
+        <label class="clonly">Cert #<input id="ieCert" inputmode="numeric" value="${esc(r.cert||(isArena(r)?r.ac:"")||"")}" aria-label="Cert number for Card Ladder"></label>
         <label class="clonly">Grader<select id="ieGr" aria-label="Grading company">${GRADERS.map(([k,l])=>`<option value="${k}" ${k===graderOf(r)?"selected":""}>${l}</option>`).join("")}</select></label>
         <label class="clonly">CL Value<span class="clbox" id="ieCl"><span class="note">—</span></span></label>
         <label class="clonly">Last sale<span class="clbox" id="ieSale"><span class="note">—</span></span></label>
         <button class="btn clonly" type="button" id="ieClUse" disabled>Use CL value → EV</button>
         <button class="btn primary" type="button" id="ieOk">${idx<list.length-1?"Confirm EV &amp; next ›":"Confirm EV &amp; finish"}</button>
-        <div class="small dim" style="flex-basis:100%">${cur!=null&&validTarget(cur)?`Will submit <b>${money2(cur)}</b>${o.ev?"":" (panel value)"} · `:""}Enter = confirm &amp; next · ← → = move (typed values are kept) · Esc = close</div>
+        <div class="small dim" style="flex-basis:100%">${cur!=null&&validTarget(cur)?`Will submit <b>${money2(cur)}</b>${arenaNote(r)?` <span class="arenanote">(${esc(arenaNote(r))})</span>`:""}${o.ev?"":" (panel value)"} · `:""}Enter = confirm &amp; next · ← → = move (typed values are kept) · Esc = close</div>
       </div>`:""}
       <dl>
         ${row("Grade",esc((r.grade||"").toUpperCase()))}
@@ -980,7 +1076,7 @@ function showInfo(id){
         ${row("Current tag",r.tag?`<span class="pill">${esc(r.tag)}</span>`:"no tag")}
         ${row("Status",esc(r.status))}
         ${row("Sport",esc(r.sport))}
-        ${row("Card number",esc(r.set_number))}${row("Cert",r.cert?copyVal(r.cert,"cert",r.item_id)+copyBtn(r.cert,"cert",r.item_id):"")}${row("AC number",r.ac?copyVal(r.ac,"AC number")+copyBtn(r.ac,"AC number"):"")}
+        ${row("Card number",esc(r.set_number))}${row("Cert",r.cert?copyVal(r.cert,"cert",r.item_id)+copyBtn(r.cert,"cert",r.item_id):"")}${row("AC number",acCopy(r))}${row("Copy line",`<span class="dim small">${esc(cardLine(r))}</span>`)}
         ${row("Storage",(r.bin||r.slot)?`Bin ${esc(r.bin??"—")} · Slot ${esc(r.slot??"—")}`:"")}
         ${row("Order",r.order_number?copyVal(r.order_number,"order number")+copyBtn(r.order_number,"order number"):"")}${row("PO",esc(r.po_number))}
         ${row("Purchase cost",r.purchase_cost!=null?money(r.purchase_cost):"")}${row("Bought at",esc(r.purchase_location))}
@@ -1051,7 +1147,7 @@ function renderBands(){
     const n=!has||(limited&&b.id!==BAND)?null:(b.id==="all"?S.matched.length:S.matched.filter(r=>inBand(r,b.id)).length);
     return `<button type="button" class="band" data-band="${b.id}" aria-pressed="${BAND===b.id&&!custom}">${b.label}${n!=null?` <span class="cnt">${n.toLocaleString()}${b.id==="all"&&S.total>S.matched.length?"+":""}</span>`:""}</button>`;}).join("")}
     ${custom?`<span class="band on">Typed: ${S.evRange.min!=null?money(S.evRange.min):"$0"}${S.evRange.max!=null?"–"+money(S.evRange.max):"+"}</span>`:""}
-    ${!has?`<span class="dim small">Pick a range to see every warehouse card in it, or type a search first.</span>`:`<label class="small dim sortpick">Sort <select id="sortSel">${SORTS.map(([k,l])=>`<option value="${k}" ${k===SORT?"selected":""}>${l}</option>`).join("")}</select></label>`}`;
+    ${!has?`<span class="dim small">${BAND==="all"?"Type a search to load cards.":"Range set — type a search to load cards in it."}</span>`:`<label class="small dim sortpick">Sort <select id="sortSel">${SORTS.map(([k,l])=>`<option value="${k}" ${k===SORT?"selected":""}>${l}</option>`).join("")}</select></label>`}`;
   const ss=$("#sortSel"); if(ss) ss.onchange=()=>{ SORT=ss.value; S.rows=sortRows(S.rows); S.page=0; render(); };
   bar.querySelectorAll(".band[data-band]").forEach(b=>b.onclick=()=>{
     BAND=b.dataset.band;
@@ -1059,7 +1155,8 @@ function renderBands(){
     // nothing on screen yet, results cut off, or the last search was limited to a range: fetch fresh
     const typedRange=S&&S.evRange&&S.evRange.typed;
     // nothing loaded yet, a range-only browse, or results cut off: fetch. Otherwise switch on screen and keep the results.
-    if(!S||S.phase!=="review"||(!S.lastText&&!typedRange)){ if(text||BAND!=="all") find(text); else { S=null; newRequest(); } return; }
+    // nothing searched yet: just remember the range for the next search (cards only load for a typed search)
+    if(!S||S.phase!=="review"||(!S.lastText&&!typedRange)){ renderBands(); $("#input").focus(); return; }
     if(S.total>S.matched.length&&!typedRange){ find(S.lastText,{band:BAND!=="all"}); return; }
     if(typedRange){ // a range typed in the search box wins over the tabs; drop it and use the tab instead
       const t=(S.lastText||"").trim(); const t2=t.replace(/\$?\s*[\d,]+(?:\.\d+)?\s*k?\s*(?:\+|or more|or greater|or higher|and up|plus)\s*(?:ev|value)?|\b(?:over|above|under|below|less than|more than|at least|between)\s*\$?\s*[\d,]+(?:\.\d+)?\s*k?(?:\s*(?:and|to|-)\s*\$?\s*[\d,]+(?:\.\d+)?\s*k?)?\s*(?:ev|value)?/gi," ").replace(/\s{2,}/g," ").trim(); $("#input").value=t2; find(t2); return; }
@@ -1117,7 +1214,7 @@ $("#confirmBtn").onclick=async()=>{
   const vals=sel.map(r=>r.ev||0).sort((a,b)=>a-b);
   const one=new Set(sel.map(r=>evOf(r))).size===1;
   const ok=await ask({title:one?`Submit ${sel.length} ${sel.length===1?"card":"cards"} at ${money2(evOf(sel[0]))}?`:`Submit ${sel.length} cards?`,
-    body:`${dryNote}${S.scope==="tasks"&&S.withCopies?(()=>{const n=sel.reduce((a,r)=>a+copiesOf(r.item_id).length,0);return n?`<b>Plus ${n} identical ${n===1?"copy":"copies"}</b> in the warehouse get the same value (their current EV is replaced).<br><br>`:""})():""}Each card is <b>submitted</b> ("done" in admin) and goes to the <b>Approve</b> tab. Values go live when they're approved.<br><b>Note:</b> ${esc(S.note.trim())}${S.lastComp===""&&S.scope!=="tasks"?`<br><span style="color:var(--warn)">No last comp entered: any card that doesn't already have one will be skipped.</span>`:""}${S.lastComp!==""?`<br><b>Last comp:</b> ${money2(Number(S.lastComp))}`:""}${S.url?`<br><b>URL:</b> ${esc(S.url)}`:""}<br><br>Current values: ${money2(vals[0])} – ${money2(vals[vals.length-1])}<br>Total: ${money(before)} → <b>${money(after)}</b> (${after>=before?"+":"−"}${money(Math.abs(after-before))})<br><br>Cards:${S.scope==="tasks"||S.over.size?`<ul class="taglist">${sel.slice(0,10).map(r=>`<li><span>${esc(r.player_name)} ${esc(r.set_number?"#"+r.set_number:"")} ${esc((r.grade||"").toUpperCase())}</span><span>${money2(evOf(r))}${lcOf(r)!==""&&lcOf(r)!=null?` · lc ${money2(num(lcOf(r)))}`:""}</span></li>`).join("")}${sel.length>10?`<li><span class="dim">…and ${sel.length-10} more</span><span></span></li>`:""}</ul>`:kindList(sel)}
+    body:`${dryNote}${S.scope==="tasks"&&S.withCopies?(()=>{const n=sel.reduce((a,r)=>a+copiesOf(r.item_id).length,0);return n?`<b>Plus ${n} identical ${n===1?"copy":"copies"}</b> in the warehouse get the same value (their current EV is replaced).<br><br>`:""})():""}Each card is <b>submitted</b> ("done" in admin) and goes to the <b>Approve</b> tab. Values go live when they're approved.<br><b>Note:</b> ${esc(S.note.trim())}${S.lastComp===""&&S.scope!=="tasks"?`<br><span style="color:var(--warn)">No last comp entered: any card that doesn't already have one will be skipped.</span>`:""}${S.lastComp!==""?`<br><b>Last comp:</b> ${money2(Number(S.lastComp))}`:""}${S.url?`<br><b>URL:</b> ${esc(S.url)}`:""}<br><br>Current values: ${money2(vals[0])} – ${money2(vals[vals.length-1])}<br>Total: ${money(before)} → <b>${money(after)}</b> (${after>=before?"+":"−"}${money(Math.abs(after-before))})<br><br>Cards:${S.scope==="tasks"||S.over.size||sel.some(r=>arenaRule(r))?`<ul class="taglist">${sel.slice(0,10).map(r=>`<li><span>${esc(r.player_name)} ${esc(r.set_number?"#"+r.set_number:"")} ${esc((r.grade||"").toUpperCase())}</span><span>${money2(evOf(r))}${arenaNote(r)?` <span class="dim">(${esc(arenaNote(r))})</span>`:""}${lcOf(r)!==""&&lcOf(r)!=null?` · lc ${money2(num(lcOf(r)))}`:""}</span></li>`).join("")}${sel.length>10?`<li><span class="dim">…and ${sel.length-10} more</span><span></span></li>`:""}</ul>`:kindList(sel)}
       ${big.length?`<br><b style="color:var(--warn)">Heads up: ${big.length} of them move more than ${window.BIG_PCT||50}% or had no value.</b>`:""}<br>Each card's current value is saved, so you can undo this.`,
     yes:dry?"Run dry run":"Yes, submit"});
   if(ok) run(sel,dry);
@@ -1145,7 +1242,8 @@ async function run(sel,dry){
       got.push(S.scope==="tasks"
       ? await api("submit-tasks",{dry_run:dry,include_copies:!!S.withCopies,items:part.map(r=>{const lc=lcOf(r);return {item_id:r.item_id,ev:evOf(r),last_comp:lc===""||lc==null?null:num(lc),url:S.url||null,note:S.note.trim()}})})
       : await api("apply",{filters:S.filters,queries:S.queries,post_filters:S.post,target_ev:T,
-          values:Object.fromEntries([...S.over].filter(([id])=>part.some(r=>r.item_id===id)).map(([id,o])=>[id,{ev:o.ev!==""&&o.ev!=null?num(o.ev):null,last_comp:o.lc!==""&&o.lc!=null?num(o.lc):null}])),
+          // every card whose value differs from the panel (typed on a tile, or an Arena slab's % of the PSA price) goes as its own value
+          values:Object.fromEntries(part.filter(r=>S.over.has(r.item_id)||evOf(r)!==T).map(r=>{const o=S.over.get(r.item_id)||{}; return [r.item_id,{ev:evOf(r),last_comp:o.lc!==""&&o.lc!=null?num(o.lc):null}];})),
           note:S.note.trim(),last_comp:S.lastComp===""?null:Number(S.lastComp),url:S.url||null,item_ids:part.map(r=>r.item_id),dry_run:dry}));
     }
     res=mergeRes(got);
@@ -1294,7 +1392,7 @@ $("#savedList").addEventListener("click",async e=>{
   }
 });
 
-$("#form").onsubmit=e=>{e.preventDefault();clearTimeout(liveT);const v=$("#input").value.trim();if(v||SCOPE==="tasks"||BAND!=="all")find(v)};
+$("#form").onsubmit=e=>{e.preventDefault();clearTimeout(liveT);const v=$("#input").value.trim();if(v||SCOPE==="tasks")find(v); else { $("#input").focus(); }};
 
 /* request box grows with long prompts; Enter runs it, Shift+Enter adds a line */
 const grow=()=>{const i=$("#input");i.style.height="auto";i.style.height=Math.min(i.scrollHeight+2,200)+"px"};

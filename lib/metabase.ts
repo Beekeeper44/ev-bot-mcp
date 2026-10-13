@@ -61,10 +61,12 @@ export type CardRow = {
   po_number: string | null;
   set_number: string | null;
   last_comp?: number | null; // only when the question has a LAST_COMP column
+  owner_email?: string | null; // order-cards question: who owns the card
 };
 
 type TemplateTag = { name: string; type: string; id?: string; ptype?: string };
 let tagCache: { at: number; tags: Record<string, TemplateTag> } | null = null;
+const tagCacheBy = new Map<number, { at: number; tags: Record<string, TemplateTag> }>();
 
 async function mb(path: string, init: RequestInit = {}) {
   const res = await fetch(`${config.metabaseHost()}${path}`, {
@@ -76,9 +78,10 @@ async function mb(path: string, init: RequestInit = {}) {
 
 // Which {{filters}} does the saved question have? Metabase reports them in different places depending on
 // version, so read all of them: native template-tags, per-stage template-tags, and the card's parameters.
-async function getTemplateTags(): Promise<Record<string, TemplateTag>> {
-  if (tagCache && Date.now() - tagCache.at < 60 * 1000) return tagCache.tags;
-  const res = await mb(`/api/card/${config.metabaseCardId()}`);
+async function getTemplateTags(cardId: number = config.metabaseCardId()): Promise<Record<string, TemplateTag>> {
+  const cached = cardId === config.metabaseCardId() ? tagCache : tagCacheBy.get(cardId) ?? null;
+  if (cached && Date.now() - cached.at < 60 * 1000) return cached.tags;
+  const res = await mb(`/api/card/${cardId}`);
   if (!res.ok) throw new Error(`Metabase card fetch failed: ${res.status} ${await res.text()}`);
   const card = await res.json();
   const tags: Record<string, TemplateTag> = {};
@@ -104,7 +107,8 @@ async function getTemplateTags(): Promise<Record<string, TemplateTag>> {
       ptype: p?.type,
     };
   }
-  tagCache = { at: Date.now(), tags };
+  if (cardId === config.metabaseCardId()) tagCache = { at: Date.now(), tags };
+  else tagCacheBy.set(cardId, { at: Date.now(), tags });
   return tags;
 }
 
@@ -167,7 +171,7 @@ export function toRow(obj: Record<string, unknown>): CardRow {
   const s = (v: unknown) => (v === null || v === undefined || v === "" ? null : String(v));
   const n = (v: unknown) => (v === null || v === undefined || v === "" ? null : Number(v));
   return {
-    item_id: String(o.ITEM_ID ?? ""),
+    item_id: String(o.ITEM_ID ?? o.CARD_ID ?? ""),
     cert_number: s(o.CERT_NUMBER),
     ac_number: s(o["8AC_NUMBER"]),
     sport: s(o.SPORT),
@@ -187,6 +191,7 @@ export function toRow(obj: Record<string, unknown>): CardRow {
     ev_age_days: n(o.EV_AGE_DAYS),
     ...("EV_DATE_SOURCE" in o ? { ev_source: (s(o.EV_DATE_SOURCE) as "approved" | "task" | null) } : {}),
     order_number: s(o.ORDER_NUMBER ?? o.NUMBER),
+    ...("OWNER_EMAIL" in o ? { owner_email: s(o.OWNER_EMAIL) } : {}),
     times_sold_back: n(o.TIMES_SOLD_BACK),
     storage_bin_id: s(o.STORAGE_BIN_ID),
     storage_bin_slot: s(o.STORAGE_BIN_SLOT),
@@ -364,3 +369,33 @@ export function gradeMatches(r: CardRow, post: PostFilters): boolean {
 }
 
 export const normNo = (v: unknown) => String(v ?? "").toLowerCase().replace(/^#|\s+|^no\.?/g, "").trim();
+
+/** Every card in an order — customers' too — from the orders question (EV_ORDERS_CARD_ID, default 44123).
+ *  Uses the question's order filter if it has one ({{order_number}}, {{number}}, {{order}}…); otherwise filters here. */
+export async function queryOrderCards(orderNumber: string): Promise<CardRow[]> {
+  const cardId = config.ordersCardId();
+  const want = String(orderNumber).replace(/^#/, "").trim().toLowerCase();
+  const tags = await getTemplateTags(cardId);
+  const tagName = ["order_number", "number", "order", "order_no", "order_num", "category_order_number"].find((k) => tags[k]?.id)
+    ?? Object.keys(tags).find((k) => /order/i.test(k) && tags[k]?.id);
+  const tt = tagName ? tags[tagName] : null;
+  const parameters = tt ? [{ id: tt.id, type: tt.ptype || (tt.type === "number" ? "number/=" : "category"), target: ["variable", ["template-tag", tagName]], value: tt.type === "number" ? [Number(want)] : [want] }] : [];
+  const path = `/api/card/${cardId}/query/json`;
+  let res = await mb(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ parameters, format_rows: false }) });
+  if (!res.ok && res.status >= 400 && res.status < 500) {
+    res = await mb(path, { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ parameters: JSON.stringify(parameters), format_rows: "false" }).toString() });
+  }
+  if (!res.ok) throw new Error(`Orders question ${cardId} failed: ${res.status} ${(await res.text()).slice(0, 300)}`);
+  const data = await res.json();
+  if (!Array.isArray(data)) throw new Error(`Unexpected response from orders question ${cardId}`);
+  if (data.length && !data.some((o: Record<string, unknown>) => Object.keys(o).some((k) => /^(item_id|card_id)$/i.test(k)))) {
+    throw new Error(`Orders question ${cardId} has no ITEM_ID column, so its cards can't be updated. Save sql/order-cards.sql as a question and set EV_ORDERS_CARD_ID to it.`);
+  }
+  const orderOf = (o: Record<string, unknown>) => {
+    const k = Object.keys(o).find((x) => /^(order_number|number|order|order_no|category_order_number)$/i.test(x));
+    return k ? String(o[k] ?? "").replace(/^#/, "").trim().toLowerCase() : null;
+  };
+  const rows = data.filter((o: Record<string, unknown>) => { const n = orderOf(o); return n === null ? !!tt : n === want; });
+  const seen = new Set<string>();
+  return rows.map(toRow).filter((r) => r.item_id && !seen.has(r.item_id) && seen.add(r.item_id)).map((r) => ({ ...r, order_number: r.order_number ?? orderNumber }));
+}
