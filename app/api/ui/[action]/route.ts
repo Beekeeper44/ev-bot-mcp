@@ -267,6 +267,12 @@ export async function POST(req: Request, ctx: Ctx) {
         return forbid(u, "editor") ?? json(await withdrawQueued({ item_ids: (body.item_ids as string[]) ?? [], actor: actorOf(u) }));
       case "undo":
         return forbid(u, "editor") ?? json(await undoRun({ run_id: str("run_id"), confirm: true, actor: actorOf(u) }));
+      case "recent": {
+        // live marks: latest submit/approve (anyone) in the last 7 days for the cards on screen
+        const ids = [...new Set(((body.item_ids as string[]) ?? []).filter((x) => typeof x === "string"))].slice(0, 6000);
+        const m = await recentSubmissions(ids);
+        return json(Object.fromEntries(m));
+      }
       case "cl-value":
         // Card Ladder value for a cert (placeholder until the real API is wired)
         return json(await lookupCardLadder({ cert: str("cert"), grader: str("grader") }));
