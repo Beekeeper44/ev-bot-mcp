@@ -36,12 +36,12 @@ Notes:
 
 | Typed | Meaning |
 |---|---|
-| `to $300`, `ev 300`, `ev = 1.2k`, `→ $85.50`, `set to 300` | **New value** (pulled out before searching) |
+| `ev $300`, `to $300`, `ev = $1.2k`, `→ $85.50`, `lc $290` | **New value / last comp** — money needs a `$`. A number without one (`ev 300`) is left out and the screen says "Values need a $". Voice adds the `$` for you ("ev three hundred") |
 | `over $200`, `under $1k`, `between $200 and $1,000` | Filters on the **current** value |
 | a pasted card row (tabs or wide gaps between columns): `2026 Pokemon Mega Evolution — Mega Lucario ex 033 — Ascended Heroes Premium Poster Collection - Mega Lucario — PSA 10` | **Exact** search: set · insert · player · card # (its own column, or on the end of the player) · parallel (`—`/blank = base) · grade, e.g. `2022-23 Panini Donruss  Rated Rookie  Chet Holmgren  202  —  PSA 9`. Insert must match too (`—` = no insert). Paste several rows (one per line) to fetch several cards at once |
 | `tag sd_wemby_grail`, `tagged inv_dump`, `#op_promo`, a bare snake_case tag (`sd-yahoo_pack` works too — hyphens become underscores), `untagged` | **Tag filter** — on its own pulls every card with that tag; with other words narrows that search. Several tags = any of them |
 | a Pokémon / One Piece title: `2023 pokemon swsh crown zenith leafeon vstar #gg35 psa 10`, `2025 one piece tony tony chopper p-101 store tournament vol.4 arena club 10` | **Title search**: finds the character first, then keeps cards where every other word is on the card (set, insert, parallel, #); year, grade and card # must match. Words that are on none of that character's cards (e.g. "swsh") are ignored and shown. Also the fallback when a normal search finds nothing |
-| `5000 or more ev`, `$5k+`, `ev 5000+`, `over $5,000`, `under $100`, `between $1,000 and $5,000`, `$500-$999`, `1k to 5k ev` | **EV range** on the current value (never read as the new value). A lone year (`2020 basketball`) keeps results to sets from that year |
+| `$5,000 or more ev`, `$5k+`, `ev $5000+`, `over $5,000`, `under $100`, `between $1,000 and $5,000`, `$500-$999`, `$1k to $5k ev` (needs the `$`) | **EV range** on the current value (never read as the new value). A lone year (`2020 basketball`) keeps results to sets from that year |
 | `ev 14 days or older` / `or higher`, `14+ days`, `older than 30 days`, `ev age 14`, `ev under 7 days`, `newer than 7 days` | **EV age** — days since the card's EV was last approved (4131 `EV_AGE_DAYS`); never read as a value. Combine with anything, e.g. `sd-yahoo_pack ev 14 days or higher` |
 | everything else | Same search as the Tag Bot (players, sets, parallels, card #, grades, AC/cert numbers) |
 

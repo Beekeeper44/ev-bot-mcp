@@ -2,7 +2,8 @@
 //   "5000 or more ev", "$5k+", "ev 5000+", "over $5,000", "at least 5000", "5000 and up"
 //   "under $100", "less than 250", "between $1,000 and $5,000", "$500-$999", "1k to 5k ev"
 // Also a lone 4-digit year ("2020 basketball") — returned so results can be held to that year.
-const N = "\\$?\\s*([\\d,]+(?:\\.\\d+)?)\\s*(k)?";
+// money needs a $ ("$5,000+", "over $1k") — bare numbers are never a price
+const N = "\\$\\s*([\\d,]+(?:\\.\\d+)?)\\s*(k)?";
 const V = (n: string, k?: string) => Number(n.replace(/,/g, "")) * (k ? 1000 : 1);
 const EVW = "(?:\\s*(?:ev|value|estimated value|estimate)s?)?";
 

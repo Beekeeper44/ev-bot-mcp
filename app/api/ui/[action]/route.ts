@@ -141,7 +141,13 @@ export async function POST(req: Request, ctx: Ctx) {
         const rangeF = { ...(evMin != null ? { min_estimated_value: evMin } : {}), ...(evMax != null ? { max_estimated_value: evMax } : {}), ...ageF };
         // order / PO numbers ("order 1234567", "po 4386")
         const ord = readOrders(rng.rest);
-        const { target, rest } = readTarget(ord.rest);
+        const { target, rest: rest0 } = readTarget(ord.rest);
+        // a value without a $ ("ev 370", "lc 366") isn't money — set it aside so it doesn't become a search word, and tell the screen
+        const needsDollar: string[] = [];
+        const rest = rest0.replace(/\b(ev|e\.v\.|lc|last\s*comp|value|estimated value)\s*[:=]?\s*(\d[\d,]*(?:\.\d+)?k?)\b(?!\s*(?:days?|d|weeks?)\b)/gi, (m) => (needsDollar.push(m.trim()), " "))
+          .replace(/\b(?:over|above|under|below|more than|less than|at least|at most|between)\s*\d[\d,]*(?:\.\d+)?k?(?:\s*(?:and|to|-)\s*\d[\d,]*(?:\.\d+)?k?)?(?:\s*(?:ev|value)s?)?\b(?!\s*(?:days?|d|weeks?)\b)/gi, (m) => (needsDollar.push(m.trim()), " "))
+          .replace(/(^|\s)\d[\d,]*(?:\.\d+)?k?\s*(?:\+|or more|or greater|or higher|or above|and up|and above|plus)(?:\s*(?:ev|value)s?)?(?=\s|$)/gi, (m, pre) => (needsDollar.push(m.trim()), pre + " "))
+          .replace(/\s{2,}/g, " ").trim();
         if (body.scope === "tasks") {
           // cards waiting for an estimate, narrowed by whatever was typed (blank = all of them)
           const t0 = Date.now();
@@ -218,6 +224,7 @@ export async function POST(req: Request, ctx: Ctx) {
         return json({
           target_ev: target,
           ev_range: { min: evMin, max: evMax, typed },
+          needs_dollar: needsDollar,
           parsed: r.parsed,
           has_filter: r.has_filter,
           queries: r.queries,
