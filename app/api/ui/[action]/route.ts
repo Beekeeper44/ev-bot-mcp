@@ -183,7 +183,9 @@ export async function POST(req: Request, ctx: Ctx) {
           ? await (async () => { const t0 = Date.now();
               let rows = (await Promise.all(ord.orders.map((o) => queryOrderCards(o)))).flat();
               rows = [...new Map(rows.map((x) => [x.item_id, x])).values()];
-              if (tg.rest.trim()) rows = filterTasks(rows as unknown as Parameters<typeof filterTasks>[0], tg.rest).rows as unknown as typeof rows;
+              // other words narrow the order; a word that matches nothing in it is ignored rather than emptying the results
+              if (tg.rest.trim()) { const f = filterTasks(rows as unknown as Parameters<typeof filterTasks>[0], tg.rest);
+                if (f.rows.length || !f.missing.length) rows = f.rows as unknown as typeof rows; }
               return { parsed: { filters: { scope: "every card in the order (customers too)" }, post_filters: {} }, has_filter: true, queries: ord.orders.map((o) => ({ __order: o })) as Record<string, unknown>[], ms: Date.now() - t0, rows, missing: [] as string[] }; })()
           : orderOnly
           ? await (async () => { const t0 = Date.now(); const rows = (await Promise.all(ordF.map((f) => queryCards({ ...f, ...rangeF })))).flat();
