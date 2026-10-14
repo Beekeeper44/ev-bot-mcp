@@ -7,8 +7,9 @@ export function readTags(text: string): { tags: string[]; untagged: boolean; res
   rest = rest.replace(/\b(untagged|no tag|without (?:a )?tag|not tagged)\b/gi, " ");
   rest = rest.replace(/\b(?:tagged(?: with)?|with tag|tags?)\b\s*[:=]?\s*#?([a-z0-9][a-z0-9_-]*)/gi, (_m, t: string) => (tags.push(t.toLowerCase()), " "));
   rest = rest.replace(/(^|\s)#([a-z0-9]*_[a-z0-9_-]*)/gi, (_m, pre: string, t: string) => (tags.push(t.toLowerCase()), pre + " "));
-  rest = rest.replace(/(^|\s)([a-z][a-z0-9]*_[a-z0-9_-]+)(?=\s|,|$)/gi, (_m, pre: string, t: string) => (tags.push(t.toLowerCase()), pre + " "));
-  return { tags: [...new Set(tags)], untagged, rest: rest.replace(/^ | $/g, "").trim() };
+  rest = rest.replace(/(^|\s)([a-z][a-z0-9-]*_[a-z0-9_-]+)(?=\s|,|$)/gi, (_m, pre: string, t: string) => (tags.push(t.toLowerCase()), pre + " "));
+  // tags are snake_case: "sd-yahoo_pack" means sd_yahoo_pack
+  return { tags: [...new Set(tags.map((t) => t.replace(/-/g, "_")))], untagged, rest: rest.replace(/^ | $/g, "").trim() };
 }
 export const hasTag = (rowTag: string | null | undefined, tags: string[]) =>
   !tags.length || tags.some((t) => String(rowTag ?? "").toLowerCase().includes(t));

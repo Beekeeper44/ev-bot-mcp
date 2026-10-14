@@ -11,6 +11,7 @@ import { parsePasted, searchPasted } from "@/lib/paste";
 import { readTags, hasTag } from "@/lib/tagfilter";
 import { titleSearch, looksLikeTcg } from "@/lib/title";
 import { readEvRange } from "@/lib/evrange";
+import { readEvAge } from "@/lib/evage";
 import { readOrders } from "@/lib/orders";
 import { lookupCardLadder } from "@/lib/cardladder";
 import { queryCards, queryOrderCards } from "@/lib/metabase";
@@ -127,14 +128,17 @@ export async function POST(req: Request, ctx: Ctx) {
     switch (action) {
       case "find": {
         // EV range: typed ("5000 or more ev", "$5k+", "under $100") and/or the range tab picked on screen
-        const rng = readEvRange(str("text"));
+        // EV age first ("ev 14 days or older"), so "14" is never read as a value
+        const age = readEvAge(str("text"));
+        const ageF = { ...(age.minDays != null ? { min_ev_age_days: age.minDays } : {}), ...(age.maxDays != null ? { max_ev_age_days: age.maxDays } : {}) };
+        const rng = readEvRange(age.rest);
         const num = (v: unknown) => (v === null || v === undefined || v === "" || !Number.isFinite(Number(v)) ? null : Number(v));
         // a range typed in the request wins; otherwise the range tab picked on screen
         const typed = rng.min != null || rng.max != null;
         const mins = [typed ? rng.min : num(body.min_ev)].filter((x): x is number => x != null);
         const maxs = [typed ? rng.max : num(body.max_ev)].filter((x): x is number => x != null);
         const evMin = mins.length ? Math.max(...mins) : null, evMax = maxs.length ? Math.min(...maxs) : null;
-        const rangeF = { ...(evMin != null ? { min_estimated_value: evMin } : {}), ...(evMax != null ? { max_estimated_value: evMax } : {}) };
+        const rangeF = { ...(evMin != null ? { min_estimated_value: evMin } : {}), ...(evMax != null ? { max_estimated_value: evMax } : {}), ...ageF };
         // order / PO numbers ("order 1234567", "po 4386")
         const ord = readOrders(rng.rest);
         const { target, rest } = readTarget(ord.rest);
@@ -167,7 +171,7 @@ export async function POST(req: Request, ctx: Ctx) {
         const byOrder = !pasted && ord.orders.length > 0;
         const orderOnly = !pasted && !byOrder && !tg.tags.length && !tg.rest.trim() && ord.pos.length > 0;
         // a range on its own (a tab picked, nothing typed): every warehouse card in that range
-        const rangeOnly = !orderOnly && !pasted && !tg.tags.length && !tg.untagged && !tg.rest.trim() && Object.keys(rangeF).length > 0;
+        const rangeOnly = !orderOnly && !(tg.tags.length) && !pasted && !tg.tags.length && !tg.untagged && !tg.rest.trim() && Object.keys(rangeF).length > 0;
         const ordF = [...ord.orders.map((o) => ({ order_number: o })), ...ord.pos.map((p) => ({ po_number: p }))];
         const r0 = byOrder
           ? await (async () => { const t0 = Date.now();
@@ -201,6 +205,8 @@ export async function POST(req: Request, ctx: Ctx) {
           && (!ord.orders.length || ord.orders.some((o) => bareN(x.order_number) === bareN(o)))
           && (!ord.pos.length || ord.pos.some((p) => bareN(x.po_number) === bareN(p)))
           && (evMin == null || (x.estimated_value ?? 0) >= evMin) && (evMax == null || (x.estimated_value ?? 0) <= evMax)
+          && (age.minDays == null || (x.ev_age_days != null && x.ev_age_days >= age.minDays))
+          && (age.maxDays == null || (x.ev_age_days != null && x.ev_age_days <= age.maxDays))
           // a year on its own ("2020 basketball") holds results to sets from that year
           && (!rng.year || pasted != null || String(x.set_name ?? "").includes(rng.year)));
         const r = { ...r0, rows: tagRows, queries: r0.queries,
