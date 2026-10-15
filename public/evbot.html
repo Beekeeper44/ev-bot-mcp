@@ -279,6 +279,13 @@ h1.brand .robot{height:112px;width:auto;flex:none;margin:0;display:block;transit
 /* light mode: the robot turns black (accents keep their teal) */
 :root[data-theme="light"] .robot{filter:invert(1) hue-rotate(180deg) brightness(.9)}
 @media (prefers-color-scheme: light){ :root:not([data-theme="dark"]) .robot{filter:invert(1) hue-rotate(180deg) brightness(.9)} }
+/* hover: green glow behind and around the robot (theme switch) */
+.robotbtn{transition:background .25s,box-shadow .25s}
+.robotbtn:hover,.robotbtn:focus-visible{background:radial-gradient(circle at 50% 45%,rgba(57,255,20,.30),rgba(57,255,20,.10) 55%,rgba(57,255,20,0) 75%);box-shadow:0 0 22px rgba(57,255,20,.35),inset 0 0 18px rgba(57,255,20,.18)}
+.robotbtn:hover .robot,.robotbtn:focus-visible .robot{filter:drop-shadow(0 0 6px #39FF14) drop-shadow(0 0 16px rgba(57,255,20,.65))}
+:root[data-theme="light"] .robotbtn:hover .robot,:root[data-theme="light"] .robotbtn:focus-visible .robot{filter:invert(1) hue-rotate(180deg) brightness(.9) drop-shadow(0 0 6px #39FF14) drop-shadow(0 0 16px rgba(57,255,20,.65))}
+@media (prefers-color-scheme: light){ :root:not([data-theme="dark"]) .robotbtn:hover .robot,:root:not([data-theme="dark"]) .robotbtn:focus-visible .robot{filter:invert(1) hue-rotate(180deg) brightness(.9) drop-shadow(0 0 6px #39FF14) drop-shadow(0 0 16px rgba(57,255,20,.65))} }
+@media (prefers-reduced-motion: reduce){ .robotbtn,.robot{transition:none} }
 h1.brand{margin:0}
 h1.brand .bt span{color:var(--go)}
 .logo-arena{height:38px;width:auto;display:block;margin-right:2px}
