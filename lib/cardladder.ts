@@ -1,8 +1,8 @@
-// Card Ladder value by cert + grading company — uses `estimatedValue` and `lastSaleDate`.
+// Card Ladder value by cert + grading company — uses `estimatedValue`, `lastSaleDate` and `confidence`.
 //   GET {CARD_LADDER_API_URL}/estimate?cert=119206372&grader=psa   →   { "estimatedValue": 32, ... }
 // Key goes in a header (CARD_LADDER_KEY_HEADER, default x-api-key); set CARD_LADDER_KEY_IN_URL=true to also
 // send it as ?key= (the test page's "send the key in the URL" option, for a 401/403).
-export type ClResult = { configured: boolean; ok?: boolean; value?: number | null; last_sale?: string | null; url?: string | null; status?: number; error?: string; note?: string };
+export type ClResult = { configured: boolean; ok?: boolean; value?: number | null; last_sale?: string | null; confidence?: number | null; url?: string | null; status?: number; error?: string; note?: string };
 
 const BASE = () => (process.env.CARD_LADDER_API_URL || "https://gateway-v1-7m6abs4l.uc.gateway.dev").replace(/\/+$/, "");
 
@@ -24,7 +24,9 @@ export async function lookupCardLadder(input: { cert: string; grader: string }):
     const n = j?.estimatedValue == null || j.estimatedValue === "" ? null : Number(j.estimatedValue);
     if (n == null || !Number.isFinite(n)) return { configured: true, ok: false, error: "Card Ladder has no estimated value for this cert." };
     // whole dollars: .50 and up rounds up, .49 and below rounds down ($152.50 → $153, $152.49 → $152)
-    return { configured: true, ok: true, value: Math.floor(Math.round(n * 100) / 100 + 0.5), last_sale: j?.lastSaleDate ? String(j.lastSaleDate) : null };
+    // Card Ladder confidence score (5 = highest)
+    const c = j?.confidence == null || j.confidence === "" ? null : Number(j.confidence);
+    return { configured: true, ok: true, value: Math.floor(Math.round(n * 100) / 100 + 0.5), last_sale: j?.lastSaleDate ? String(j.lastSaleDate) : null, confidence: c != null && Number.isFinite(c) ? c : null };
   } catch (e) {
     return { configured: true, ok: false, error: e instanceof Error ? e.message : String(e) };
   }
