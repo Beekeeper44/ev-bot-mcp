@@ -269,6 +269,7 @@ dialog.info{max-width:760px;width:calc(100% - 32px);padding:0}
 .conftip{display:block;font-size:11px;font-weight:700;margin-top:1px}
 .confvs{display:block;font-size:11px;font-weight:600;color:var(--text);opacity:.85;margin-top:1px}
 .confvs b{font-weight:800}
+.confvs .vsbig{color:#e5484d;font-weight:900}
 #clSale,#ieSale{height:auto!important;min-height:54px;padding-top:6px;padding-bottom:6px;white-space:normal;overflow:visible}
 .conf-hi{color:var(--go)}
 .conf-mid{color:#f5a524}
@@ -745,7 +746,7 @@ function clConfHtml(c,cmp){
   const [lvl,tip]=v>=4?["conf-hi","Good"]:v>=3?["conf-mid","Check vs old EV"]:["conf-lo","Check vs old EV or manual comp"];
   /* every score: show the old EV next to the CL value so the check is right there */
   let vs="";
-  if(cmp&&cmp.old>0&&cmp.cl>0){ const d=Math.round((cmp.cl-cmp.old)/cmp.old*100); vs=`<span class="confvs">${cmp.label||"Old EV"} <b>${money2(cmp.old)}</b> · CL ${d>0?"+":""}${d}%</span>`; }
+  if(cmp&&cmp.old>0&&cmp.cl>0){ const d=Math.round((cmp.cl-cmp.old)/cmp.old*100); vs=`<span class="confvs">${cmp.label||"Old EV"} <b>${money2(cmp.old)}</b> · <span class="${Math.abs(d)>=15?"vsbig":""}" title="${Math.abs(d)>=15?"CL is 15% or more away from the old EV":"CL is within 15% of the old EV"}">CL ${d>0?"+":""}${d}%</span></span>`; }
   return `<span class="confline ${lvl}" title="Card Ladder confidence ${v} of 5 — ${tip}"><span class="conftip">${tip}</span>${vs}</span>`;
 }
 /* big confidence badge that sits inside the CL Value box */
