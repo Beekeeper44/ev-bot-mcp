@@ -532,3 +532,20 @@ export async function recentSubmissions(itemIds: string[], days = 7) {
   );
   return new Map(rows.map((r) => [r.item_id, { ev: Number(r.new_ev), at: r.submitted_at, by: r.submitted_by, status: r.status === "approved" ? "approved" : "submitted" }]));
 }
+
+
+/** AC grid re-comp (deck "AC Slabs Keep Rate and Comps", Oct 20 2026): cards already re-comped through ev-bot,
+ *  found by the marker in the submit note, so a card is never cut twice. */
+export const AC_GRID_MARKER = "ac grid v1";
+export async function gridDone(itemIds: string[]) {
+  if (!itemIds.length) return [] as string[];
+  const rows = await q<{ item_id: string }>(
+    `SELECT DISTINCT i.item_id
+     FROM ev_run_items i
+     WHERE i.item_id = ANY($1::text[])
+       AND i.note ILIKE '%' || $2 || '%'
+       AND i.status IN ('submitted','approved','approve_failed','mismatch')`,
+    [itemIds, AC_GRID_MARKER]
+  );
+  return rows.map((r) => r.item_id);
+}

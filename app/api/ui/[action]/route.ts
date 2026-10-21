@@ -1,7 +1,7 @@
 // JSON API for the EV Bot screen. Everything except sign-in/setup/invites needs a signed-in account.
 import { config } from "@/lib/config";
 import { type CardFilters, type PostFilters } from "@/lib/metabase";
-import { runSelection, undoRun, listRuns, getRunItems, submitTasks, approvalQueue, approveQueued, withdrawQueued, recentSubmissions, type SubmitItem } from "@/lib/runs";
+import { runSelection, undoRun, listRuns, getRunItems, submitTasks, approvalQueue, approveQueued, withdrawQueued, recentSubmissions, gridDone, AC_GRID_MARKER, type SubmitItem } from "@/lib/runs";
 import { listTasks, filterTasks } from "@/lib/tasks";
 import { findCopies } from "@/lib/copies";
 import { listPrompts, addPrompt, renamePrompt, deletePrompt } from "@/lib/ui";
@@ -285,6 +285,11 @@ export async function POST(req: Request, ctx: Ctx) {
         const ids = [...new Set(((body.item_ids as string[]) ?? []).filter((x) => typeof x === "string"))].slice(0, 6000);
         const m = await recentSubmissions(ids);
         return json(Object.fromEntries(m));
+      }
+      case "grid-done": {
+        // AC grid re-comp: which of these cards were already cut (submit note has the marker)
+        const ids = [...new Set(((body.item_ids as string[]) ?? []).filter((x) => typeof x === "string"))].slice(0, 20000);
+        return json({ marker: AC_GRID_MARKER, done: await gridDone(ids) });
       }
       case "cl-value":
         // Card Ladder value for a cert (placeholder until the real API is wired)

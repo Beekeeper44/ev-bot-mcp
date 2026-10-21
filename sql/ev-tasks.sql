@@ -49,7 +49,7 @@ LEFT JOIN (SELECT * FROM APP_PROD.ADMIN.CARD_CERT_NUMBER WHERE NOT COALESCE(_SNO
        ON ccert.card_id = cards.id
 WHERE cards.status NOT IN ('shipped', 'archived')
 ORDER BY t.requested_at
-LIMIT 5000;
+LIMIT 1048575;
 
 /*----------------------------------------------------------------------
   CHECK QUERY — run this first (separately) to see which column marks an
