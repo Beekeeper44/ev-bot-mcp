@@ -19,6 +19,7 @@ import { probeEv, openAdminSession, liveEv, type LiveEv } from "@/lib/admin";
 import {
   can, actorOf, currentUser, sessionCookie, clearCookie, signIn, needsSetup, setupFirstAdmin, inviteInfo, acceptInvite,
   changePassword, listUsers, addUser, updateUser, relinkAdmin, testAdminLink, resetInvite, newMcpKey, revokeMcpKey, type User, type Role,
+  canTeam,
 } from "@/lib/users";
 
 export const maxDuration = 300;
@@ -38,6 +39,7 @@ function me(u: User, req: Request) {
     user: u.name, email: u.email, role: u.role, id: u.id,
     can_write: can(u, "editor") && (!shared || config.sharedSessionFallback()),
     can_approve: can(u, "approver"),
+    can_team: can(u, "approver") && canTeam(u),
     tasks_configured: config.evTasksCardId() > 0,
     is_admin: can(u, "admin"),
     admin_link: shared ? (config.sharedSessionFallback() ? "shared" : "missing") : "own",
@@ -78,7 +80,7 @@ export async function GET(req: Request, ctx: Ctx) {
       case "approvals": {
         // "Mine" (default): only what this person submitted. "Everyone": the whole queue.
         const scope = new URL(req.url).searchParams.get("scope");
-        return json(await approvalQueue(2000, scope === "all" ? null : u.id));
+        return json(await approvalQueue(2000, scope === "all" && canTeam(u) ? null : u.id));
       }
       case "users":
         return forbid(u, "admin") ?? json(await listUsers());
@@ -278,7 +280,7 @@ export async function POST(req: Request, ctx: Ctx) {
         return json(Object.fromEntries([...m].map(([k, rows]) => [k, rows.map((r) => ({ item_id: r.item_id, ac: r.ac_number, ev: r.estimated_value, grade: r.grade, img: r.front_slab_picture_url, number_checked: (r as { number_checked?: boolean }).number_checked !== false }))])));
       }
       case "approve":
-        return forbid(u, "approver") ?? json(await approveQueued({ item_ids: body.all === true ? "all" : ((body.item_ids as string[]) ?? []), mine_only: body.scope !== "all", note: str("note") || undefined, actor: actorOf(u), dry_run: body.dry_run === true }));
+        return forbid(u, "approver") ?? json(await approveQueued({ item_ids: body.all === true ? "all" : ((body.item_ids as string[]) ?? []), mine_only: !(body.scope === "all" && canTeam(u)), note: str("note") || undefined, actor: actorOf(u), dry_run: body.dry_run === true }));
       case "withdraw":
         return forbid(u, "editor") ?? json(await withdrawQueued({ item_ids: (body.item_ids as string[]) ?? [], actor: actorOf(u) }));
       case "undo":
@@ -347,6 +349,7 @@ export async function POST(req: Request, ctx: Ctx) {
           role: (body.role as Role) || undefined,
           active: typeof body.active === "boolean" ? body.active : undefined,
           admin_user_id: body.admin_user_id === undefined ? undefined : String(body.admin_user_id ?? ""),
+          team_view: typeof body.team_view === "boolean" ? body.team_view : undefined,
         }, u);
         return json({ ok: true });
       }

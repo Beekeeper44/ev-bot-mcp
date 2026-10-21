@@ -24,6 +24,7 @@ export type User = {
   admin_user_id: string | null;
   admin_email?: string | null;
   active: boolean;
+  team_view: boolean; // can switch the Approve tab to Team (admins always can)
   has_password: boolean;
   has_mcp_key: boolean;
   created_by: string | null;
@@ -42,7 +43,7 @@ export function actorOf(u: User): Actor {
   return { ...u, session_user_id: config.sessionUserId(), attribution: "shared", note_suffix: ` · by ${u.name}` };
 }
 
-const COLS = `id, email, name, role, admin_user_id, admin_email, active, (pw_hash IS NOT NULL) AS has_password,
+const COLS = `id, email, name, role, admin_user_id, admin_email, active, coalesce(team_view, false) AS team_view, (pw_hash IS NOT NULL) AS has_password,
   (mcp_key_hash IS NOT NULL) AS has_mcp_key, created_by, created_at, last_login_at`;
 const norm = (e: string) => String(e || "").trim().toLowerCase();
 const sha = (v: string) => createHash("sha256").update(v).digest("hex");
@@ -202,16 +203,20 @@ export async function addUser(input: { email: string; name: string; role: Role; 
   return { id, invite_token: await newInvite(id), admin_user_id: adminId, linked_automatically: !input.admin_user_id && !!adminId };
 }
 
-export async function updateUser(id: string, patch: { role?: Role; active?: boolean; admin_user_id?: string | null; name?: string }, by: User) {
+/** Team approve queue: admins always; everyone else only when an admin turns it on for them in Users. */
+export const canTeam = (u: { role: Role; team_view?: boolean }) => u.role === "admin" || !!u.team_view;
+
+export async function updateUser(id: string, patch: { role?: Role; active?: boolean; admin_user_id?: string | null; name?: string; team_view?: boolean }, by: User) {
   if (id === by.id && (patch.active === false || (patch.role && patch.role !== "admin"))) throw new Error("You can't remove your own admin access.");
   if (patch.role && !ROLES.includes(patch.role)) throw new Error("Unknown role.");
   if (patch.admin_user_id && !/^[0-9a-f-]{36}$/i.test(patch.admin_user_id.trim())) throw new Error("Admin user ID should look like 2290bf05-5cae-…");
   await q(
     `UPDATE ev_users SET role=COALESCE($2,role), active=COALESCE($3,active),
        admin_user_id=CASE WHEN $4::boolean THEN NULLIF($5,'') ELSE admin_user_id END, name=COALESCE(NULLIF($6,''),name),
-       mcp_key_hash=CASE WHEN $3 = false THEN NULL ELSE mcp_key_hash END
+       mcp_key_hash=CASE WHEN $3 = false THEN NULL ELSE mcp_key_hash END,
+       team_view=COALESCE($7,team_view)
      WHERE id=$1`,
-    [id, patch.role ?? null, patch.active ?? null, patch.admin_user_id !== undefined, patch.admin_user_id?.trim() ?? "", patch.name ?? ""]
+    [id, patch.role ?? null, patch.active ?? null, patch.admin_user_id !== undefined, patch.admin_user_id?.trim() ?? "", patch.name ?? "", patch.team_view ?? null]
   );
 }
 /** Link a person to their admin login by email — their ev-bot email, or a different admin email

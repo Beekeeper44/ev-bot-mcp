@@ -451,6 +451,25 @@ dialog:has(.artbl){max-width:680px!important;width:min(680px,94vw)!important}
 .aqseg{display:inline-flex;gap:4px;margin-right:8px;vertical-align:middle}
 .aqseg .btn{padding:4px 10px;font-size:12px}
 .aqseg .btn[aria-pressed="true"]{background:var(--go);border-color:var(--go);color:#06120a}
+.utbl th{white-space:nowrap;user-select:none}
+.utbl th[draggable="true"]{cursor:grab}
+.utbl th.sortable{cursor:pointer}
+.utbl th .grip{opacity:.35;margin-right:6px;font-size:11px;letter-spacing:-2px}
+.utbl th:hover .grip{opacity:.8}
+.utbl th .sarr{margin-left:6px;font-size:10px;opacity:.7}
+.utbl th[aria-sort="ascending"] .sarr,.utbl th[aria-sort="descending"] .sarr{opacity:1;color:var(--go)}
+.utbl th.dragging{opacity:.4}
+.utbl th.dropto{box-shadow:inset 3px 0 0 var(--go)}
+.tswitch{display:inline-flex;align-items:center;gap:8px;cursor:pointer}
+.tswitch input{position:absolute;opacity:0;width:1px;height:1px}
+.tswitch span{width:34px;height:18px;border-radius:999px;background:var(--line);position:relative;transition:background .15s;flex:none}
+.tswitch span::after{content:"";position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:#fff;transition:transform .15s}
+.tswitch input:checked+span{background:var(--go)}
+.tswitch input:checked+span::after{transform:translateX(16px)}
+.tswitch input:focus-visible+span{outline:2px solid var(--go);outline-offset:2px}
+.tswitch input:disabled+span{opacity:.6}
+.tswitch i{font-style:normal;font-size:12px;color:var(--dim)}
+@media (prefers-reduced-motion:reduce){.tswitch span,.tswitch span::after{transition:none}}
 </style>
 </head>
 <body>
@@ -1769,7 +1788,8 @@ const T={rows:[],loaded:false,sent:new Map()};
 /* Approve queue: "Mine" (default) = only what you submitted, so several people can submit and approve at once
    without seeing each other's cards. Approvers can switch to "Everyone". Saved per browser. */
 const A={rows:[],sel:new Set(),done:null,scope:(()=>{try{return localStorage.getItem("evbot_aq")==="all"?"all":"mine"}catch{return "mine"}})()};
-const apprPath=()=>`approvals?scope=${A.scope==="all"&&ME&&ME.can_approve?"all":"mine"}`;
+const canTeamQ=()=>!!(ME&&(ME.can_team!==undefined?ME.can_team:ME.can_approve));
+const apprPath=()=>`approvals?scope=${A.scope==="all"&&canTeamQ()?"all":"mine"}`;
 async function loadApprovals(){
   const box=$("#apprBox"); if(!A.rows.length) box.innerHTML=`<div class="empty"><span class="spin"></span>Loading the Approve queue…</div>`;
   try{ A.rows=await api(apprPath()); }catch(e){ box.innerHTML=`<div class="empty">${esc(e.message)}</div>`; return; }
@@ -1781,7 +1801,7 @@ function renderApprovals(){
   const box=$("#apprBox"), canA=ME&&ME.can_approve;
   const total=A.rows.reduce((a,r)=>a+Number(r.new_ev||0),0);
   box.innerHTML=`${A.done?`<div class="summary result" style="margin-bottom:10px"><div><div class="rh">${A.done.head}</div><div class="dim small">${A.done.sub}</div></div></div>`:""}
-    <div class="qhead"><div>${canA?`<span class="aqseg" role="group" aria-label="Whose cards"><button type="button" class="btn ${A.scope!=="all"?"go":""}" data-aq="mine" aria-pressed="${A.scope!=="all"}">Mine</button><button type="button" class="btn ${A.scope==="all"?"go":""}" data-aq="all" aria-pressed="${A.scope==="all"}">Everyone</button></span> `:""}<b>${A.rows.length}</b> ${A.scope==="all"&&canA?"":"of your "}submitted ${A.rows.length===1?"card":"cards"} waiting for approval <span class="dim small">· ${money(total)} total</span> <button class="btn link" id="aRefresh" type="button">Refresh</button></div>
+    <div class="qhead"><div>${canTeamQ()?`<span class="aqseg" role="group" aria-label="Whose cards"><button type="button" class="btn ${A.scope!=="all"?"go":""}" data-aq="mine" aria-pressed="${A.scope!=="all"}">Me</button><button type="button" class="btn ${A.scope==="all"?"go":""}" data-aq="all" aria-pressed="${A.scope==="all"}">Team</button></span> `:""}<b>${A.rows.length}</b> ${A.scope==="all"&&canTeamQ()?"":"of your "}submitted ${A.rows.length===1?"card":"cards"} waiting for approval <span class="dim small">· ${money(total)} total</span> <button class="btn link" id="aRefresh" type="button">Refresh</button></div>
       ${canA?`<label class="small" style="display:flex;gap:6px;align-items:center"><b>Approve note</b><input id="aNote" value="${esc(A.note??window.APPROVE_NOTE)}" style="padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--text)"></label>`:`<span class="dim small">Only approvers can approve. You can withdraw your own submits.</span>`}</div>
     ${A.rows.length?`<div class="qwrap"><table class="qtbl"><thead><tr><th><input type="checkbox" id="aAll" ${A.rows.every(r=>A.sel.has(r.item_id))?"checked":""} aria-label="Select all"></th><th></th><th>card</th><th>live now</th><th>new EV</th><th>last comp</th><th>note</th><th>submitted</th><th></th></tr></thead><tbody>
       ${A.rows.map(r=>`<tr data-id="${esc(r.item_id)}"><td><input type="checkbox" data-sel ${A.sel.has(r.item_id)?"checked":""}></td>
@@ -1819,7 +1839,7 @@ async function doApprove(ids,all){
   $("#amsg").innerHTML=`<span class="spin"></span>${dry?"Dry run":"Approving"}… ${rows.length} cards`; $("#aall").disabled=$("#aselBtn").disabled=true;
   let res; const B=window.MAX_ITEMS||250, idList=rows.map(r=>r.item_id), parts=chunks(idList,B), got=[];
   try{
-    if(all&&rows.length<=B) got.push(await api("approve",{all:true,scope:A.scope==="all"?"all":"mine",note,dry_run:dry}));
+    if(all&&rows.length<=B) got.push(await api("approve",{all:true,scope:A.scope==="all"&&canTeamQ()?"all":"mine",note,dry_run:dry}));
     else for(const [bi,part] of parts.entries()){ if(parts.length>1) $("#amsg").innerHTML=`<span class="spin"></span>${dry?"Dry run":"Approving"}… batch ${bi+1} of ${parts.length} — keep this tab open`; got.push(await api("approve",{item_ids:part,note,dry_run:dry})); }
     res=mergeRes(got);
   }
@@ -1930,7 +1950,7 @@ const ROLE_HELP={viewer:"search only",editor:"submits; values wait for approval"
 async function renderUsers(){
   if(!ME||!ME.is_admin) return;
   const box=$("#usersBox");
-  box.innerHTML=`${ME.full_access?`<div class="dim small" style="margin:4px 0 8px">Everyone signed in has full access: search, submit, approve and undo. <b>Admin</b> only adds the Users tab.</div>`:""}<div class="adduser">
+  box.innerHTML=`${ME.full_access?`<div class="dim small" style="margin:4px 0 8px">Everyone signed in has full access: search, submit, approve and undo. <b>Admin</b> only adds the Users tab. <b>Team queue</b> on = that person can switch Approve from <b>Me</b> (their own cards) to <b>Team</b> (everyone's). Drag a column header to move it; click one to sort.</div>`:""}<div class="adduser">
       <label>Name<input id="nuName" placeholder="Marisa Lopez"></label>
       <label>Work email<input id="nuEmail" type="email" placeholder="name@arenaclub.com"></label>
       <label>Role<select id="nuRole">${(ME.full_access?["approver","admin"]:["viewer","editor","approver","admin"]).map(r=>`<option value="${r}" ${r==="approver"?"selected":""}>${ME.full_access&&r==="approver"?"member":r} — ${ROLE_HELP[r]}</option>`).join("")}</select></label>
@@ -1948,18 +1968,48 @@ async function renderUsers(){
   };
   loadUsers();
 }
+/* Users table: drag a column header to move it, click User / role / status / last sign-in to sort. Both remembered in this browser. */
+const UCOLS={
+  user:{h:"User",sort:u=>(u.name||"").toLowerCase(),td:u=>`<b>${esc(u.name)}</b><br><span class="dim">${esc(u.email)}</span>`},
+  role:{h:"role",sort:u=>({admin:0,approver:1,editor:2,viewer:3})[u.role]??9,td:u=>`<select data-f="role" ${u.id===ME.id?"disabled":""}>${(ME.full_access?["approver","admin"]:["viewer","editor","approver","admin"]).map(r=>`<option value="${r}" ${r===u.role||(ME.full_access&&r==="approver"&&u.role!=="admin")?"selected":""}>${ME.full_access&&r==="approver"?"member":r}</option>`).join("")}</select>`},
+  team:{h:"team queue",sort:u=>u.role==="admin"||u.team_view?0:1,td:u=>u.role==="admin"
+    ?`<label class="tswitch" title="Admins always see the Team queue"><input type="checkbox" checked disabled><span></span><i>always</i></label>`
+    :`<label class="tswitch" title="On: can switch the Approve tab to Team (everyone's cards). Off: Me only."><input type="checkbox" data-f="team" ${u.team_view?"checked":""}><span></span><i>${u.team_view?"on":"off"}</i></label>`},
+  admin:{h:"admin login",td:u=>`${u.admin_user_id?`<span class="link-own">linked</span> <span class="dim small">${esc(u.admin_email||u.email)}</span>`:`<span class="link-shared">not linked</span>`}
+      <br><button class="btn link" data-act="relink">link by admin email</button><button class="btn link" data-act="test">test</button><button class="btn link" data-act="setid">paste ID</button>`},
+  status:{h:"status",sort:u=>!u.active?2:u.has_password?0:1,td:u=>`${!u.active?`<span class="dim">off</span>`:u.has_password?"active":`<span class="link-shared">invited</span>`}${u.has_mcp_key?` · <span class="dim">Claude</span>`:""}`},
+  login:{h:"last sign-in",sort:u=>u.last_login_at?-new Date(u.last_login_at).getTime():Infinity,td:u=>`<span class="dim">${u.last_login_at?when(u.last_login_at):"—"}</span>`},
+  acts:{h:"",td:u=>u.id===ME.id?`<span class="dim small">you</span>`:`${u.active&&!u.has_password?`<button class="btn link" data-act="invite">new invite link</button>`:""}${u.active&&u.has_password?`<button class="btn link" data-act="invite">reset password link</button>`:""}<button class="btn link" data-act="toggle">${u.active?"turn off":"turn on"}</button>`},
+};
+const UDEF=["user","role","team","admin","status","login","acts"];
+const U={users:[],order:(()=>{try{const o=JSON.parse(localStorage.getItem("evbot_ucols")||"null"); if(Array.isArray(o)&&o.length===UDEF.length&&UDEF.every(k=>o.includes(k))) return o;}catch{} return UDEF.slice();})(),
+  sort:(()=>{try{return JSON.parse(localStorage.getItem("evbot_usort")||"null")}catch{return null}})()};
 async function loadUsers(){
   let users; try{ users=await api("users"); }catch(e){ $("#usersTbl").textContent=e.message; return; }
-  $("#usersTbl").innerHTML=`<table><tr><th>person</th><th>role</th><th>admin login</th><th>status</th><th>last sign-in</th><th></th></tr>${users.map(u=>`<tr data-id="${esc(u.id)}">
-    <td><b>${esc(u.name)}</b><br><span class="dim">${esc(u.email)}</span></td>
-    <td><select data-f="role" ${u.id===ME.id?"disabled":""}>${(ME.full_access?["approver","admin"]:["viewer","editor","approver","admin"]).map(r=>`<option value="${r}" ${r===u.role||(ME.full_access&&r==="approver"&&u.role!=="admin")?"selected":""}>${ME.full_access&&r==="approver"?"member":r}</option>`).join("")}</select></td>
-    <td>${u.admin_user_id?`<span class="link-own">linked</span> <span class="dim small">${esc(u.admin_email||u.email)}</span>`:`<span class="link-shared">not linked</span>`}
-      <br><button class="btn link" data-act="relink">link by admin email</button><button class="btn link" data-act="test">test</button><button class="btn link" data-act="setid">paste ID</button></td>
-    <td>${!u.active?`<span class="dim">off</span>`:u.has_password?"active":`<span class="link-shared">invited</span>`}${u.has_mcp_key?` · <span class="dim">Claude</span>`:""}</td>
-    <td class="dim">${u.last_login_at?when(u.last_login_at):"—"}</td>
-    <td>${u.id===ME.id?`<span class="dim small">you</span>`:`${u.active&&!u.has_password?`<button class="btn link" data-act="invite">new invite link</button>`:""}${u.active&&u.has_password?`<button class="btn link" data-act="invite">reset password link</button>`:""}<button class="btn link" data-act="toggle">${u.active?"turn off":"turn on"}</button>`}</td>
-  </tr><tr class="uout" data-for="${esc(u.id)}"><td colspan="6" style="padding:0;border:0"></td></tr>`).join("")}</table>`;
+  U.users=users; drawUsers();
+}
+function drawUsers(){
+  let users=U.users.slice();
+  if(U.sort&&UCOLS[U.sort.k]&&UCOLS[U.sort.k].sort){ const f=UCOLS[U.sort.k].sort, d=U.sort.d; users.sort((a,b)=>{const x=f(a),y=f(b); return ((x<y?-1:x>y?1:0)*d)||(a.name||"").localeCompare(b.name||"");});/* ties stay A→Z */ }
+  const n=U.order.length;
+  $("#usersTbl").innerHTML=`<table class="utbl"><tr>${U.order.map(k=>{const c=UCOLS[k], on=U.sort&&U.sort.k===k;
+      return `<th draggable="true" data-col="${k}" class="${c.sort?"sortable":""}" title="Drag to move${c.sort?" · click to sort":""}"${c.sort?` aria-sort="${on?(U.sort.d>0?"ascending":"descending"):"none"}"`:""}><span class="grip" aria-hidden="true">⋮⋮</span>${c.h}${c.sort?`<span class="sarr">${on?(U.sort.d>0?"▲":"▼"):"↕"}</span>`:""}</th>`;}).join("")}</tr>${users.map(u=>`<tr data-id="${esc(u.id)}">${U.order.map(k=>`<td>${UCOLS[k].td(u)}</td>`).join("")}</tr><tr class="uout" data-for="${esc(u.id)}"><td colspan="${n}" style="padding:0;border:0"></td></tr>`).join("")}</table>`;
+  // sort on click
+  $("#usersTbl").querySelectorAll("th.sortable").forEach(th=>th.onclick=()=>{ const k=th.dataset.col; U.sort=U.sort&&U.sort.k===k?{k,d:-U.sort.d}:{k,d:1}; try{localStorage.setItem("evbot_usort",JSON.stringify(U.sort))}catch{}; drawUsers(); });
+  // drag a header onto another to move the column
+  let dragK=null;
+  $("#usersTbl").querySelectorAll("th[data-col]").forEach(th=>{
+    th.ondragstart=e=>{ dragK=th.dataset.col; th.classList.add("dragging"); try{e.dataTransfer.setData("text/plain",dragK); e.dataTransfer.effectAllowed="move";}catch{} };
+    th.ondragend=()=>{ th.classList.remove("dragging"); $("#usersTbl").querySelectorAll("th.dropto").forEach(x=>x.classList.remove("dropto")); };
+    th.ondragover=e=>{ if(!dragK||dragK===th.dataset.col) return; e.preventDefault(); th.classList.add("dropto"); };
+    th.ondragleave=()=>th.classList.remove("dropto");
+    th.ondrop=e=>{ e.preventDefault(); const to=th.dataset.col; if(!dragK||dragK===to) return; const o=U.order.filter(k=>k!==dragK); o.splice(o.indexOf(to)+(U.order.indexOf(dragK)<U.order.indexOf(to)?1:0),0,dragK); U.order=o; try{localStorage.setItem("evbot_ucols",JSON.stringify(o))}catch{}; dragK=null; drawUsers(); };
+  });
+  users=U.users;
   const out=id=>document.querySelector(`tr.uout[data-for="${id}"] td`);
+  $("#usersTbl").querySelectorAll("input[data-f=team]").forEach(cb=>cb.onchange=async()=>{ const id=cb.closest("tr").dataset.id, u=U.users.find(x=>x.id===id);
+    try{ await post("users-update",{id,team_view:cb.checked}); u.team_view=cb.checked; cb.nextElementSibling.nextElementSibling.textContent=cb.checked?"on":"off"; out(id).innerHTML=`<span class="small">${esc(u.name)} ${cb.checked?"can now switch the Approve tab to <b>Team</b>.":"now sees <b>Me</b> only in the Approve tab."}</span>`; }
+    catch(e){ cb.checked=!cb.checked; out(id).innerHTML=`<span style="color:var(--warn)">${esc(e.message)}</span>`; } });
   $("#usersTbl").querySelectorAll("select[data-f=role]").forEach(sel=>sel.onchange=async()=>{const id=sel.closest("tr").dataset.id; try{await post("users-update",{id,role:sel.value}); out(id).innerHTML=`<span class="small">Role set to ${esc(sel.value)}.</span>`}catch(e){out(id).innerHTML=`<span style="color:var(--warn)">${esc(e.message)}</span>`}});
   $("#usersTbl").querySelectorAll("button[data-act]").forEach(b=>b.onclick=async()=>{
     const id=b.closest("tr").dataset.id, u=users.find(x=>x.id===id), o=out(id);
