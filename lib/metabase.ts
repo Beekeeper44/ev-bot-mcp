@@ -308,7 +308,10 @@ async function queryOnce(filters: CardFilters, post: PostFilters = {}): Promise<
 
   if (post.only_untagged) rows = rows.filter((r) => !r.tag);
   if (post.only_base) rows = rows.filter((r) => !r.parallel_name);
-  if (post.sports?.length) rows = rows.filter((r) => post.sports!.some((sp) => (r.sport ?? "").toLowerCase().includes(sp)));
+  if (post.sports?.length) {
+    const nm = (x: string) => x.toLowerCase().replace(/[\s_-]+/g, "_"); // "star wars" = "star_wars"
+    rows = rows.filter((r) => post.sports!.some((sp) => nm(r.sport ?? "").includes(nm(sp))));
+  }
   if (post.graders?.length || post.grade_pairs?.length || post.grade_nums?.length) rows = rows.filter((r) => gradeMatches(r, post));
   // 4131's number filters are "contains"; keep exact matches only
   if (typeof filters.ac_number === "string") rows = rows.filter((r) => r.ac_number === filters.ac_number);

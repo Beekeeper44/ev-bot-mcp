@@ -5,11 +5,17 @@ import { queryCards, type CardFilters, type CardRow, type PostFilters } from "./
 import { parseRequest, buildLexiconFromRows, extractIds, STOP, ALIAS as ALIAS_RAW, GENERIC_SETS, GENERIC_PARALLELS } from "./parse";
 const ALIAS = ALIAS_RAW as Record<string, string>;
 
-// categories people type in plain words -> 4131 SPORT value
-const SPORTS: [string, string][] = [
-  ["one piece", "one_piece"], ["one_piece", "one_piece"], ["pokemon", "pokemon"], ["pokémon", "pokemon"],
-  ["basketball", "basketball"], ["baseball", "baseball"], ["football", "football"], ["hockey", "hockey"],
-  ["soccer", "soccer"], ["magic", "magic"], ["yugioh", "yugioh"], ["yu-gi-oh", "yugioh"], ["lorcana", "lorcana"],
+// categories people type in plain words -> 4131 SPORT value(s). Any combination works ("wrestling racing marvel");
+// each word is its own Metabase category (combat and ufc are separate). 4131 matches inside SPORT (ILIKE %value%; "_" matches a space too).
+const SPORTS: [string, string[]][] = [
+  ["one piece", ["one_piece"]], ["one_piece", ["one_piece"]], ["pokemon", ["pokemon"]], ["pokémon", ["pokemon"]],
+  ["basketball", ["basketball"]], ["baseball", ["baseball"]], ["football", ["football"]], ["hockey", ["hockey"]],
+  ["soccer", ["soccer"]], ["magic", ["magic"]], ["yugioh", ["yugioh"]], ["yu-gi-oh", ["yugioh"]], ["lorcana", ["lorcana"]],
+  ["wrestling", ["wrestling"]], ["wwe", ["wrestling"]], ["aew", ["wrestling"]],
+  ["combat", ["combat"]], ["ufc", ["ufc"]], ["mma", ["mma"]], ["boxing", ["boxing"]],
+  ["racing", ["racing"]], ["nascar", ["nascar"]], ["f1", ["f1"]], ["formula 1", ["f1"]],
+  ["marvel", ["marvel"]], ["star wars", ["star_wars"]], ["star_wars", ["star_wars"]], ["starwars", ["star_wars"]],
+  ["disney", ["disney"]], ["dc", ["dc"]],
 ];
 // words that never start or form a name on their own
 const EXTRA_STOP = new Set(("this these those that here there some any one ones two three four five me us our ours your his her their " +
@@ -95,7 +101,12 @@ export async function smartSearch(text: string, extra: CardFilters = {}) {
   const low = " " + ids.rest.toLowerCase() + " ";
   // every sport named counts: "basketball football baseball" = any of the three
   const sportWords: string[] = [], sports: string[] = [];
-  for (const [word, sport] of SPORTS) if (new RegExp("\\b" + esc(word) + "\\b").test(low)) { sportWords.push(word); if (!sports.includes(sport)) sports.push(sport); }
+  const sportNames: string[] = [];
+  for (const [word, vals] of SPORTS) if (new RegExp("\\b" + esc(word) + "\\b").test(low)) {
+    if (sportWords.some((w) => w.includes(word) || word.includes(w))) continue; // "star wars" once, not "star wars" + "star_wars"
+    sportWords.push(word); sportNames.push(word);
+    for (const v of vals) if (!sports.includes(v)) sports.push(v);
+  }
   if (sports.length === 1) base.sport = sports[0];
   else if (sports.length > 1) { delete base.sport; post.sports = sports; }
 
@@ -123,7 +134,7 @@ export async function smartSearch(text: string, extra: CardFilters = {}) {
     // several sports: one 4131 query per sport (each filtered in Metabase), then merged
     const queries: CardFilters[] = sports.length > 1 ? sports.map((sp) => ({ ...base, sport: sp })) : [base];
     const rows = await union(queries, post);
-    return done(t0, parsed, sports.length > 1 ? { ...base, sport: sports.join(" / ") } : base, post, queries, rows, []);
+    return done(t0, parsed, sports.length > 1 ? { ...base, sport: sportNames.join(" / ") } : base, post, queries, rows, []);
   }
 
   const probe = makeProber(base, post);
