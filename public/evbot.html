@@ -447,6 +447,7 @@ dialog:has(.artbl){max-width:680px!important;width:min(680px,94vw)!important}
 .ac10pick .btn[aria-pressed="true"] .dim{color:inherit;opacity:.75}
 .ac10row{margin-top:6px;display:flex;align-items:center;flex-wrap:wrap;gap:4px}
 .infoedit .ie10{display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin-bottom:2px}
+.autofill{color:var(--go)!important;font-style:italic}
 </style>
 </head>
 <body>
@@ -1282,6 +1283,8 @@ function bindTiles(){
     const id=box.dataset.for, r=S.rows.find(x=>x.item_id===id);
     box.querySelectorAll("input[data-te]").forEach(inp=>{
       inp.oninput=()=>{ const o=S.over.get(id)||{}; o[inp.dataset.te]=inp.value.replace(/[$,\s]/g,""); S.over.set(id,o);
+        if(inp.dataset.te==="lc"){ inp.dataset.manual=inp.value.trim()===""?"":"1"; inp.classList.remove("autofill"); }
+        if(inp.dataset.te==="ev"&&r.last_comp==null){ const li=box.querySelector('input[data-te="lc"]'); if(li&&li.dataset.manual!=="1"){ const v0=evOf(r); li.value=v0!=null?String(v0):""; o.lc=li.value; S.over.set(id,o); li.classList.toggle("autofill",li.value!==""); } }
         const tw=box.closest(".tw"), tc=tw.querySelector(".tagchange"); const v=evOf(r);
         tc.innerHTML=v==null||!validTarget(v)?`<span class="dim">Enter a value</span>`:`${arenaNote(r)?`<div class="arenanote">${esc(arenaNote(r))} =</div>`:""}<span class="pill old">${money2(r.ev||0)}</span><span class="dim">→</span><span class="pill new">${money2(v)}</span>`;
         const lci=box.querySelector('input[data-te="lc"]'); lci.classList.toggle("need",lcMissing(r));
@@ -1390,7 +1393,7 @@ function showInfo(id){
   d.dataset.card=id;
   const ic=$("#ieCert"), ig=$("#ieGr"), iu=$("#ieClUse");
   if(ic&&CL_ON){ ic.onchange=()=>infoCl(id); ig.onchange=()=>infoCl(id);
-    iu.onclick=()=>{ const ev=$("#ieEv"); if(iu.dataset.v){ ev.value=iu.dataset.v; ev.dataset.cl=iu.dataset.v; ev.classList.remove("need","flashbox"); void ev.offsetWidth; ev.classList.add("flashbox"); ev.focus(); } };
+    iu.onclick=()=>{ const ev=$("#ieEv"); if(iu.dataset.v){ ev.value=iu.dataset.v; ev.dataset.cl=iu.dataset.v; ev.dispatchEvent(new Event("input")); ev.classList.remove("need","flashbox"); void ev.offsetWidth; ev.classList.add("flashbox"); ev.focus(); } };
     infoCl(id); }
   d.onkeydown=e=>{
     if(e.key==="Enter"&&(e.target.id==="ieCert"||e.target.id==="ieGr")){ e.preventDefault(); infoCl(id); return; }
@@ -1400,6 +1403,20 @@ function showInfo(id){
   };
   d.onclose=()=>{ if(S) render(); };
   const ev=$("#ieEv"); if(ev){ setTimeout(()=>{ ev.focus(); ev.select(); },0); }
+  /* no last comp on the card → the box fills itself with the EV that will be submitted, as you type (until you type your own) */
+  const lcI=$("#ieLc");
+  if(ev&&lcI&&r.last_comp==null){
+    const preview=()=>{ const t=ev.value.replace(/[$,\s]/g,"");
+      if(t===""){ const cur=evOf(r); return cur!=null?String(cur):""; }
+      if(!isMoney(t)) return "";
+      const b=num(t), o=S.over.get(id)||{};
+      if(ev.dataset.cl&&num(ev.dataset.cl)===b) return String(b); // Card Ladder value goes in as-is
+      const ar=arenaRule(r); return String(ar?arenaCalc(b,ar[1],gridSport(r),ar[2]).to:b); };
+    const auto=()=>{ if(lcI.dataset.manual==="1") return; lcI.value=preview(); lcI.classList.toggle("autofill",lcI.value!==""); };
+    ev.addEventListener("input",auto);
+    lcI.addEventListener("input",()=>{ lcI.dataset.manual=lcI.value.trim()===""?"":"1"; lcI.classList.remove("autofill"); if(!lcI.dataset.manual) auto(); });
+    if(lcI.value==="") auto();
+  }
 }
 function renderBar(n,big){
   const bar=$("#bar"); bar.hidden=false;

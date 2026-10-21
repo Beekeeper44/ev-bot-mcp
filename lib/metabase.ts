@@ -30,6 +30,7 @@ export type PostFilters = {
   graders?: string[]; // any of these companies (any grade unless a pair or number says otherwise)
   grade_pairs?: [string, string][]; // exact company + grade, e.g. ["psa","10"]
   grade_nums?: string[]; // these grades for the listed companies (or any company if none listed)
+  sports?: string[]; // several sports in one request ("basketball football baseball"): any of these
 };
 
 export type CardRow = {
@@ -307,6 +308,7 @@ async function queryOnce(filters: CardFilters, post: PostFilters = {}): Promise<
 
   if (post.only_untagged) rows = rows.filter((r) => !r.tag);
   if (post.only_base) rows = rows.filter((r) => !r.parallel_name);
+  if (post.sports?.length) rows = rows.filter((r) => post.sports!.some((sp) => (r.sport ?? "").toLowerCase().includes(sp)));
   if (post.graders?.length || post.grade_pairs?.length || post.grade_nums?.length) rows = rows.filter((r) => gradeMatches(r, post));
   // 4131's number filters are "contains"; keep exact matches only
   if (typeof filters.ac_number === "string") rows = rows.filter((r) => r.ac_number === filters.ac_number);

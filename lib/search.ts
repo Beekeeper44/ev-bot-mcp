@@ -93,8 +93,11 @@ export async function smartSearch(text: string, extra: CardFilters = {}) {
 
   // plain-word categories
   const low = " " + ids.rest.toLowerCase() + " ";
-  let sportWord: string | null = null;
-  for (const [word, sport] of SPORTS) if (new RegExp("\\b" + esc(word) + "\\b").test(low)) { base.sport = sport; sportWord = word; break; }
+  // every sport named counts: "basketball football baseball" = any of the three
+  const sportWords: string[] = [], sports: string[] = [];
+  for (const [word, sport] of SPORTS) if (new RegExp("\\b" + esc(word) + "\\b").test(low)) { sportWords.push(word); if (!sports.includes(sport)) sports.push(sport); }
+  if (sports.length === 1) base.sport = sports[0];
+  else if (sports.length > 1) { delete base.sport; post.sports = sports; }
 
   // ---- card numbers: straight lookups ----
   if (ids.ac.length || ids.cert.length) {
@@ -111,14 +114,16 @@ export async function smartSearch(text: string, extra: CardFilters = {}) {
   // ---- names: each phrase goes into 4131's player filter; if nothing, try it as a set, then a parallel ----
   const setWords = typeof base.set_name === "string" ? base.set_name.toLowerCase().split("%") : [];
   const parWords = typeof base.parallel_name === "string" ? [base.parallel_name.toLowerCase()] : [];
-  const used = [...setWords, ...parWords, ...(sportWord ? [sportWord] : []), ...GENERIC_SETS.filter((g) => setWords.includes(g)), ...GENERIC_PARALLELS.filter((g) => parWords.includes(g))];
+  const used = [...setWords, ...parWords, ...sportWords, ...GENERIC_SETS.filter((g) => setWords.includes(g)), ...GENERIC_PARALLELS.filter((g) => parWords.includes(g))];
   const phrases = namePhrases(ids.rest, used);
 
   if (!phrases.length) {
-    const hasFilter = Object.keys(base).length > 0 || !!post.only_base;
+    const hasFilter = Object.keys(base).length > 0 || !!post.only_base || sports.length > 1;
     if (!hasFilter) return done(t0, parsed, {}, post, [], [], [], false);
-    const rows = await union([base], post);
-    return done(t0, parsed, base, post, [base], rows, []);
+    // several sports: one 4131 query per sport (each filtered in Metabase), then merged
+    const queries: CardFilters[] = sports.length > 1 ? sports.map((sp) => ({ ...base, sport: sp })) : [base];
+    const rows = await union(queries, post);
+    return done(t0, parsed, sports.length > 1 ? { ...base, sport: sports.join(" / ") } : base, post, queries, rows, []);
   }
 
   const probe = makeProber(base, post);
