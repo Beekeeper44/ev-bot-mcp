@@ -158,6 +158,21 @@ with sync_playwright() as p:
     check(f"chart ✓ Arena {g} {sp} off {s10 if g=='10' else s9}: $100 → ${exp}", got, [s10 if g=='10' else s9, exp])
   pg.evaluate("()=>{setAc10('CGC 10'); setAc9('PSA 9');}")
   check("9 source saved", pg.evaluate("()=>localStorage.getItem('evbot_ac9')"), "PSA 9")
+  # L. Approve tab: "Mine" by default, "Everyone" for approvers; Approve all sends the scope
+  pg.evaluate("""()=>{ ME={can_write:true,can_approve:true,role:'admin',name:'T'}; window.__calls=[];
+    const mine=[{run_id:'r1',item_id:'a',label:'1 · Mine card',new_ev:10,submitted_by:'T'}], all=mine.concat([{run_id:'r2',item_id:'b',label:'2 · Other card',new_ev:20,submitted_by:'Jesse'}]);
+    api=async(p,b)=>{ window.__calls.push([p,b]); if(p.startsWith('approvals')) return p.includes('scope=all')?all:mine; if(p==='approve') return {approved:1,failed:0,approved_ids:[]}; return {}; };
+    try{localStorage.removeItem('evbot_aq')}catch{}; A.scope='mine'; A.rows=[]; document.getElementById('tab-approve').hidden=false; return loadApprovals(); }""")
+  pg.wait_for_timeout(300)
+  check("Approve tab asks for my queue by default", pg.evaluate("()=>window.__calls.filter(c=>c[0].startsWith('approvals')).pop()[0]"), "approvals?scope=mine")
+  check("Mine shows only my card", pg.evaluate("()=>A.rows.map(r=>r.item_id)"), ["a"])
+  pg.click('[data-aq="all"]'); pg.wait_for_timeout(300)
+  check("Everyone shows the whole queue", pg.evaluate("()=>[window.__calls.filter(c=>c[0].startsWith('approvals')).pop()[0], A.rows.map(r=>r.item_id), localStorage.getItem('evbot_aq')]"), ["approvals?scope=all",["a","b"],"all"])
+  pg.click('[data-aq="mine"]'); pg.wait_for_timeout(300)
+  check("back to Mine", pg.evaluate("()=>A.rows.map(r=>r.item_id)"), ["a"])
+  pg.evaluate("()=>{ME.can_approve=false; A.scope='all'; return loadApprovals();}"); pg.wait_for_timeout(300)
+  check("non-approvers always get their own queue", pg.evaluate("()=>[window.__calls.filter(c=>c[0].startsWith('approvals')).pop()[0], !!document.querySelector('[data-aq]')]"), ["approvals?scope=mine", False])
+  pg.evaluate("()=>{ME.can_approve=true; A.scope='mine'; document.getElementById('tab-approve').hidden=true;}")
   # H. popup renders with deck wording
   pg.evaluate("()=>{ARENA_ON=true; document.getElementById('arRules').click()}"); pg.wait_for_timeout(300)
   txt=pg.evaluate("()=>document.querySelector('dialog[open]').textContent")

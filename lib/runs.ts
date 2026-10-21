@@ -313,26 +313,35 @@ export async function goLive(input: { run_id: string; confirm: boolean; actor: A
 }
 
 // ============ APPROVE ============
-export async function approvalQueue(limit = 2000) {
+/** Cards still being approved after this long are treated as stuck (closed tab, timeout) and can be approved again. */
+const STUCK = "interval '10 minutes'";
+const QUEUED = `(i.status IN ('submitted','approve_failed') OR (i.status='approving' AND i.updated_at < now() - ${STUCK}))`;
+
+/** The Approve queue. userId = only what that person submitted ("Mine"); null = everyone's. */
+export async function approvalQueue(limit = 2000, userId: string | null = null) {
   return q(
     `SELECT i.run_id, i.item_id, i.label, i.img, i.new_ev, i.last_comp, i.comp_url, i.note, i.previous_ev, i.estimate_id,
-            i.status, i.approve_error, coalesce(i.submitted_by, r.requested_by) AS submitted_by, coalesce(i.submitted_at, i.updated_at) AS submitted_at
+            CASE WHEN i.status='approving' THEN 'approve_failed' ELSE i.status END AS status, i.approve_error,
+            coalesce(i.submitted_by, r.requested_by) AS submitted_by, r.requested_by_id AS submitted_by_id,
+            coalesce(i.submitted_at, i.updated_at) AS submitted_at
      FROM ev_run_items i JOIN ev_runs r ON r.id=i.run_id
-     WHERE i.status IN ('submitted','approve_failed') AND r.action IN ('set','tasks')
+     WHERE ${QUEUED} AND r.action IN ('set','tasks') AND ($2::text IS NULL OR r.requested_by_id=$2)
      ORDER BY coalesce(i.submitted_at, i.updated_at) LIMIT $1`,
-    [limit]
+    [limit, userId]
   );
 }
 
 /** Approves queued cards (all, or the ones given). Each approve uses the value/last comp/URL that was submitted. */
-export async function approveQueued(input: { item_ids?: string[] | "all"; note?: string; actor: Actor; dry_run?: boolean }) {
+export async function approveQueued(input: { item_ids?: string[] | "all"; note?: string; actor: Actor; dry_run?: boolean; mine_only?: boolean }) {
   need(input.actor, "approver", "approving estimates");
   const note = (input.note || config.evApproveNote()).trim();
   type QI = { run_id: string; item_id: string; label: string | null; img: string | null; new_ev: string; last_comp: string | null; comp_url: string | null; estimate_id: string | null; previous_ev: string | null; prev_fields: EvSnapshot | null; submit_record: EstimateRecord | null };
+  // "Approve all" only covers the queue the person is looking at: their own unless they chose Everyone
   let rows = await q<QI>(
     `SELECT i.run_id, i.item_id, i.label, i.img, i.new_ev, i.last_comp, i.comp_url, i.estimate_id, i.previous_ev, i.prev_fields, i.submit_record
      FROM ev_run_items i JOIN ev_runs r ON r.id=i.run_id
-     WHERE i.status IN ('submitted','approve_failed') AND r.action IN ('set','tasks') ORDER BY i.submitted_at`
+     WHERE ${QUEUED} AND r.action IN ('set','tasks') AND ($1::text IS NULL OR r.requested_by_id=$1) ORDER BY i.submitted_at`,
+    [input.item_ids === "all" && input.mine_only ? input.actor.id : null]
   );
   if (input.item_ids !== "all") {
     const want = new Set(input.item_ids ?? []);
@@ -359,13 +368,36 @@ export async function approveQueued(input: { item_ids?: string[] | "all"; note?:
     await q(`UPDATE ev_runs SET status='dry_run_completed', finished_at=now(), result=$2 WHERE id=$1`, [id, JSON.stringify({ dry_run: true, would_approve: rows.length })]);
     return { run_id: id, status: "dry_run_completed", would_approve: rows.length, approved_ids: [] as string[] };
   }
-  const session = await openAdminSession(input.actor.session_user_id);
+  // claim the cards first, so two people approving at the same time never approve the same card twice
+  const claimed = await q<{ run_id: string; item_id: string }>(
+    `UPDATE ev_run_items i SET status='approving', updated_at=now()
+     WHERE (i.run_id, i.item_id) IN (SELECT * FROM unnest($1::text[], $2::text[])) AND ${QUEUED}
+     RETURNING i.run_id, i.item_id`,
+    [rows.map((r) => r.run_id), rows.map((r) => r.item_id)]
+  );
+  const mine = new Set(claimed.map((c) => c.run_id + "|" + c.item_id));
+  const skipped = rows.length - mine.size;
+  rows = rows.filter((r) => mine.has(r.run_id + "|" + r.item_id));
+  if (skipped) await q(`DELETE FROM ev_run_items WHERE run_id=$1 AND NOT (item_id = ANY($2::text[]))`, [id, rows.map((r) => r.item_id)]);
+  if (!rows.length) {
+    await q(`UPDATE ev_runs SET status='completed', finished_at=now(), result=$2 WHERE id=$1`, [id, JSON.stringify({ approved: 0, skipped })]);
+    throw new Error("Someone else is already approving these cards. Refresh the Approve tab.");
+  }
+  const release = () => q(
+    `UPDATE ev_run_items SET status='submitted', updated_at=now() WHERE status='approving' AND (run_id, item_id) IN (SELECT * FROM unnest($1::text[], $2::text[]))`,
+    [rows.map((r) => r.run_id), rows.map((r) => r.item_id)]
+  );
+  let session: Awaited<ReturnType<typeof openAdminSession>>;
+  try { session = await openAdminSession(input.actor.session_user_id); } catch (e) { await release(); throw e; }
   const startedAt = new Date().toISOString();
   let results;
   try {
     results = await pool(rows, config.writeConcurrency(), (r) =>
       approveEv(session, r.item_id, r.submit_record, Number(r.new_ev), { note: note + input.actor.note_suffix, last_comp: r.last_comp == null ? null : Number(r.last_comp), url: r.comp_url }, startedAt)
     );
+  } catch (e) {
+    await release();
+    throw e;
   } finally {
     await session.revoke();
   }
@@ -383,7 +415,7 @@ export async function approveQueued(input: { item_ids?: string[] | "all"; note?:
   );
   const approved = rows.filter((_, i) => st[i] === "approved").map((r) => r.item_id);
   const res = {
-    approved_ids: approved, approved: approved.length, failed: st.length - approved.length,
+    approved_ids: approved, approved: approved.length, failed: st.length - approved.length, skipped_in_progress: skipped,
     failures: results.map((r, i) => ({ item_id: rows[i].item_id, label: rows[i].label, status: r.status, error: r.error })).filter((_, i) => st[i] !== "approved").slice(0, 30),
   };
   const status = res.failed ? "partial" : "completed";

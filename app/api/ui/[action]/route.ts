@@ -75,8 +75,11 @@ export async function GET(req: Request, ctx: Ctx) {
           })),
         });
       }
-      case "approvals":
-        return json(await approvalQueue());
+      case "approvals": {
+        // "Mine" (default): only what this person submitted. "Everyone": the whole queue.
+        const scope = new URL(req.url).searchParams.get("scope");
+        return json(await approvalQueue(2000, scope === "all" ? null : u.id));
+      }
       case "users":
         return forbid(u, "admin") ?? json(await listUsers());
       default:
@@ -275,7 +278,7 @@ export async function POST(req: Request, ctx: Ctx) {
         return json(Object.fromEntries([...m].map(([k, rows]) => [k, rows.map((r) => ({ item_id: r.item_id, ac: r.ac_number, ev: r.estimated_value, grade: r.grade, img: r.front_slab_picture_url, number_checked: (r as { number_checked?: boolean }).number_checked !== false }))])));
       }
       case "approve":
-        return forbid(u, "approver") ?? json(await approveQueued({ item_ids: body.all === true ? "all" : ((body.item_ids as string[]) ?? []), note: str("note") || undefined, actor: actorOf(u), dry_run: body.dry_run === true }));
+        return forbid(u, "approver") ?? json(await approveQueued({ item_ids: body.all === true ? "all" : ((body.item_ids as string[]) ?? []), mine_only: body.scope !== "all", note: str("note") || undefined, actor: actorOf(u), dry_run: body.dry_run === true }));
       case "withdraw":
         return forbid(u, "editor") ?? json(await withdrawQueued({ item_ids: (body.item_ids as string[]) ?? [], actor: actorOf(u) }));
       case "undo":

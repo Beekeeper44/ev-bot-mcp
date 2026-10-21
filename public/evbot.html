@@ -448,6 +448,9 @@ dialog:has(.artbl){max-width:680px!important;width:min(680px,94vw)!important}
 .ac10row{margin-top:6px;display:flex;align-items:center;flex-wrap:wrap;gap:4px}
 .infoedit .ie10{display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin-bottom:2px}
 .autofill{color:var(--go)!important;font-style:italic}
+.aqseg{display:inline-flex;gap:4px;margin-right:8px;vertical-align:middle}
+.aqseg .btn{padding:4px 10px;font-size:12px}
+.aqseg .btn[aria-pressed="true"]{background:var(--go);border-color:var(--go);color:#06120a}
 </style>
 </head>
 <body>
@@ -1763,10 +1766,13 @@ const isMoney=v=>v!==""&&v!=null&&Number.isFinite(Number(String(v).replace(/[$,\
 const num=v=>Math.round(Number(String(v).replace(/[$,\s]/g,""))*100)/100;
 const T={rows:[],loaded:false,sent:new Map()};
 /* ---------- Approve: everything submitted, approve in bulk ---------- */
-const A={rows:[],sel:new Set(),done:null};
+/* Approve queue: "Mine" (default) = only what you submitted, so several people can submit and approve at once
+   without seeing each other's cards. Approvers can switch to "Everyone". Saved per browser. */
+const A={rows:[],sel:new Set(),done:null,scope:(()=>{try{return localStorage.getItem("evbot_aq")==="all"?"all":"mine"}catch{return "mine"}})()};
+const apprPath=()=>`approvals?scope=${A.scope==="all"&&ME&&ME.can_approve?"all":"mine"}`;
 async function loadApprovals(){
   const box=$("#apprBox"); if(!A.rows.length) box.innerHTML=`<div class="empty"><span class="spin"></span>Loading the Approve queue…</div>`;
-  try{ A.rows=await api("approvals"); }catch(e){ box.innerHTML=`<div class="empty">${esc(e.message)}</div>`; return; }
+  try{ A.rows=await api(apprPath()); }catch(e){ box.innerHTML=`<div class="empty">${esc(e.message)}</div>`; return; }
   A.sel=new Set([...A.sel].filter(id=>A.rows.some(r=>r.item_id===id)));
   if(!A.touched) A.sel=new Set(A.rows.map(r=>r.item_id));
   renderApprovals(); refreshCounts();
@@ -1775,7 +1781,7 @@ function renderApprovals(){
   const box=$("#apprBox"), canA=ME&&ME.can_approve;
   const total=A.rows.reduce((a,r)=>a+Number(r.new_ev||0),0);
   box.innerHTML=`${A.done?`<div class="summary result" style="margin-bottom:10px"><div><div class="rh">${A.done.head}</div><div class="dim small">${A.done.sub}</div></div></div>`:""}
-    <div class="qhead"><div><b>${A.rows.length}</b> submitted ${A.rows.length===1?"card":"cards"} waiting for approval <span class="dim small">· ${money(total)} total</span> <button class="btn link" id="aRefresh" type="button">Refresh</button></div>
+    <div class="qhead"><div>${canA?`<span class="aqseg" role="group" aria-label="Whose cards"><button type="button" class="btn ${A.scope!=="all"?"go":""}" data-aq="mine" aria-pressed="${A.scope!=="all"}">Mine</button><button type="button" class="btn ${A.scope==="all"?"go":""}" data-aq="all" aria-pressed="${A.scope==="all"}">Everyone</button></span> `:""}<b>${A.rows.length}</b> ${A.scope==="all"&&canA?"":"of your "}submitted ${A.rows.length===1?"card":"cards"} waiting for approval <span class="dim small">· ${money(total)} total</span> <button class="btn link" id="aRefresh" type="button">Refresh</button></div>
       ${canA?`<label class="small" style="display:flex;gap:6px;align-items:center"><b>Approve note</b><input id="aNote" value="${esc(A.note??window.APPROVE_NOTE)}" style="padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--text)"></label>`:`<span class="dim small">Only approvers can approve. You can withdraw your own submits.</span>`}</div>
     ${A.rows.length?`<div class="qwrap"><table class="qtbl"><thead><tr><th><input type="checkbox" id="aAll" ${A.rows.every(r=>A.sel.has(r.item_id))?"checked":""} aria-label="Select all"></th><th></th><th>card</th><th>live now</th><th>new EV</th><th>last comp</th><th>note</th><th>submitted</th><th></th></tr></thead><tbody>
       ${A.rows.map(r=>`<tr data-id="${esc(r.item_id)}"><td><input type="checkbox" data-sel ${A.sel.has(r.item_id)?"checked":""}></td>
@@ -1788,6 +1794,7 @@ function renderApprovals(){
         <td>${r.status==="approve_failed"?`<span class="errc" title="${esc(r.approve_error||"")}">approve failed — retry</span>`:""}</td></tr>`).join("")}
     </tbody></table></div>`:`<div class="empty">Nothing waiting for approval.${A.done?"":" Submit estimates from the Request tab."}</div>`}`;
   const r=$("#aRefresh"); if(r) r.onclick=()=>{A.done=null;loadApprovals()};
+  box.querySelectorAll("[data-aq]").forEach(b=>b.onclick=()=>{ if(A.scope===b.dataset.aq) return; A.scope=b.dataset.aq; try{localStorage.setItem("evbot_aq",A.scope)}catch{}; A.rows=[]; A.sel=new Set(); A.touched=false; A.done=null; loadApprovals(); });
   const n=$("#aNote"); if(n) n.oninput=()=>{A.note=n.value};
   const all=$("#aAll"); if(all) all.onchange=()=>{A.touched=true; A.sel=all.checked?new Set(A.rows.map(x=>x.item_id)):new Set(); renderApprovals();};
   box.querySelectorAll("tr[data-id] [data-sel]").forEach(cb=>cb.onchange=()=>{A.touched=true; const id=cb.closest("tr").dataset.id; cb.checked?A.sel.add(id):A.sel.delete(id); renderAbar();});
@@ -1812,11 +1819,11 @@ async function doApprove(ids,all){
   $("#amsg").innerHTML=`<span class="spin"></span>${dry?"Dry run":"Approving"}… ${rows.length} cards`; $("#aall").disabled=$("#aselBtn").disabled=true;
   let res; const B=window.MAX_ITEMS||250, idList=rows.map(r=>r.item_id), parts=chunks(idList,B), got=[];
   try{
-    if(all&&rows.length<=B) got.push(await api("approve",{all:true,note,dry_run:dry}));
+    if(all&&rows.length<=B) got.push(await api("approve",{all:true,scope:A.scope==="all"?"all":"mine",note,dry_run:dry}));
     else for(const [bi,part] of parts.entries()){ if(parts.length>1) $("#amsg").innerHTML=`<span class="spin"></span>${dry?"Dry run":"Approving"}… batch ${bi+1} of ${parts.length} — keep this tab open`; got.push(await api("approve",{item_ids:part,note,dry_run:dry})); }
     res=mergeRes(got);
   }
-  catch(e){ if(got.length){ res=mergeRes(got); res.failed=(res.failed||0)+(rows.length-(res.approved||0)-(res.failed||0)); } else { $("#amsg").innerHTML=`<span style="color:var(--warn)">${esc(e.message)}</span>`; renderAbar(); return; } }
+  catch(e){ if(got.length){ res=mergeRes(got); res.failed=(res.failed||0)+(rows.length-(res.approved||0)-(res.failed||0)); } else { A.done={head:`<span style="color:var(--warn)">Not approved</span>`,sub:esc(e.message)}; renderApprovals(); return; } } // (the bottom bar redraws itself, so the reason shows in the banner)
   if(res.status==="dry_run_completed"){ $("#amsg").innerHTML=`<b>Dry run done.</b> ${res.would_approve} would be approved.`; renderAbar(); return; }
   if(S&&S.matched&&res.approved_ids&&res.approved_ids.length){
     S.live=S.live||new Map(); const now=new Date(Date.now()+1000).toISOString(), byId=new Map(rows.map(r=>[r.item_id,r]));
@@ -1838,7 +1845,7 @@ $("#awithdraw").onclick=async()=>{
   A.touched=false; T.loaded=false; loadApprovals();
 };
 async function refreshCounts(){
-  try{ if(!A.rows.length||$("#tab-approve").hidden){ A.rows=await api("approvals"); } }catch{}
+  try{ if(!A.rows.length||$("#tab-approve").hidden){ A.rows=await api(apprPath()); } }catch{}
   const ac=$("#apprCount"); ac.hidden=!A.rows.length; ac.textContent=A.rows.length;
   const tc=$("#taskCount"); tc.hidden=!window.TASK_OPEN; tc.textContent=window.TASK_OPEN||"";
 }
