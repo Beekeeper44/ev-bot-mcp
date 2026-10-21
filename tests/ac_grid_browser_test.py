@@ -3,7 +3,7 @@ from decimal import Decimal, ROUND_HALF_UP
 from playwright.sync_api import sync_playwright
 URL="file://" + __import__("os").path.abspath(__import__("os").path.join(__import__("os").path.dirname(__file__), "..", "public", "evbot.html")) + ""
 CUTS={"pokemon":[.25,.25,.30,.35],"onepiece":[.35,.40,.40,.40],"sports":[.10,.30,.35,.35]}
-BANDS=[(10,20),(20,35),(35,60),(60,1e18)]
+BANDS=[(11,21),(21,36),(36,61),(61,1e18)]
 FACT={"10":.80,"9.5":1,"9":1,"8.5":1,"8":.90,"7.5":1,"7":1,"6":1}
 MARKET={"10":(.80,.80),"9.5":(.70,.85),"9":(.60,.70)}   # Alan's charts with default sources (CGC 10, PSA 9): (TCG, sports), no cut on top
 def whole(x): return int(Decimal(str(round(x,2))).quantize(Decimal("1"),rounding=ROUND_HALF_UP))
@@ -50,7 +50,7 @@ with sync_playwright() as p:
       check(f"new comp ${comp} Arena {g} {sp}",got,new_comp(comp,g,sp))
   check("panel shows what Arena cards submit", pg.evaluate("()=>/Arena 10 Pokémon/.test(document.querySelector('.arenapanel')?.textContent||'')"), True)
   # C/D. re-comp mode: band edges + rounding + skips + payload
-  evs=[9.99,10,19.99,20,34.99,35,45,59.99,60,1000]
+  evs=[9.99,10,10.99,11,19.99,20,20.99,21,34.99,35,35.5,36,45,59.99,60,60.99,61,1000]
   rc=[]; i=100
   for sp in CUTS:
     for ev in evs: rc.append(card(i,sp,ev)); i+=1

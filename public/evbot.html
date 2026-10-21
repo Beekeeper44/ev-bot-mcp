@@ -757,10 +757,10 @@ document.getElementById("arRules").onclick=()=>{
     return `<tr><td>Arena ${g==="6.5"?"6.5 and below":g}</td><td>${g==="6.5"?p:esc(rs[0][0])}</td><td>${same?pct(fs[0]):`${pct(fs[0])} TCG<br>${pct(fs[2])} sports`}<div class="dim small">${mk?"new comp":"− cut"}</div></td>${SP.map((sp,i)=>`<td>${money2(arenaCalc(EX,fs[i],sp,mk).to)}</td>`).join("")}</tr>`; }).join("")}
   </table><br>
   <b>Cut, by sport and value</b>
-  <table class="artbl"><tr><th></th><th>Under $10</th>${AC_GRID_BANDS.map(b=>`<th>${b[2]}</th>`).join("")}</tr>
+  <table class="artbl"><tr><th></th><th>$10 and under</th>${AC_GRID_BANDS.map(b=>`<th>${b[2]}</th>`).join("")}</tr>
   ${SP.map(sp=>`<tr><td>${AC_GRID[sp].name}</td><td class="dim">none</td>${AC_GRID[sp].cuts.map(c=>`<td><b>−${pct(c)}</b></td>`).join("")}</tr>`).join("")}
   </table>
-  <div class="dim small" style="margin-top:6px">Under $10: no cut. Other sports use Sports. Source: AC Slabs deck, Oct 20, 2026.</div>`,yes:"OK"}); };
+  <div class="dim small" style="margin-top:6px">$10 and under: no cut. Other sports use Sports. Source: AC Slabs deck, Oct 20, 2026.</div>`,yes:"OK"}); };
 document.body.classList.toggle("cl-off",!CL_ON);
 setTimeout(()=>setClMode(CL_ON),0);
 /* Card Ladder: cert # + grader → CL Value; "Use CL value → EV" fills the estimated value.
@@ -953,14 +953,14 @@ let ARENA_ON=true; try{ ARENA_ON=localStorage.getItem("evbot_arena")!=="off"; }c
 function arenaRule(r){ if(!ARENA_ON||!isArena(r)) return null; const g=String(r.grade||"").trim().split(/\s+/).pop()||""; return ruleFor(g,gridSport(r)); }
 /* ---------- AC grid re-comp (deck "AC Slabs Keep Rate and Comps", Oct 20 2026) ----------
    For Arena Club slabs already in the system: new EV = today's EV × (1 − cut), by sport and today's EV band.
-   Under $10: no cut. Whole dollars (.50 rounds up). Each card is cut once — the submit note carries "ac grid v1". */
+   $10 and under: no cut. Whole dollars (.50 rounds up). Each card is cut once — the submit note carries "ac grid v1". */
 const AC_GRID_MARKER="ac grid v1";
 const wholeUp=x=>Math.floor(Math.round(x*100)/100+0.5); // whole dollars, .50 rounds up (cents first, so 31.4999… counts as 31.50)
-const AC_GRID_BANDS=[[10,20,"$10–20"],[20,35,"$20–35"],[35,60,"$35–60"],[60,Infinity,"$60+"]];
+const AC_GRID_BANDS=[[11,21,"$11–20"],[21,36,"$21–35"],[36,61,"$36–60"],[61,Infinity,"$61+"]]; // whole-dollar bands: $20.50 is still $11–20
 const AC_GRID={pokemon:{name:"Pokémon",cuts:[.25,.25,.30,.35]},onepiece:{name:"One Piece",cuts:[.35,.40,.40,.40]},sports:{name:"Sports",cuts:[.10,.30,.35,.35]}};
 const gridSport=r=>{ const t=`${r.sport||""} ${r.set_name||""}`.toLowerCase(); return /pok[eé]mon/.test(t)?"pokemon":/one[\s_-]*piece/.test(t)?"onepiece":"sports"; };
 function gridOf(r){ // → {cut, band, sport, ev} or null when no cut applies
-  const ev=Number(r.ev||0); if(!(ev>=10)) return null;
+  const ev=Number(r.ev||0); if(!(ev>=11)) return null;
   const bi=AC_GRID_BANDS.findIndex(([lo,hi])=>ev>=lo&&ev<hi); if(bi<0) return null;
   const sp=gridSport(r), g=AC_GRID[sp];
   return {cut:g.cuts[bi], band:AC_GRID_BANDS[bi][2], sport:g.name, ev, to:wholeUp(ev*(1-g.cuts[bi]))};
@@ -969,8 +969,8 @@ const hasOldEv=r=>Number(r.ev||0)>0;
 /* re-comp applies to Arena slabs that already have an EV; a brand-new Arena slab (no EV yet) is priced the normal way: comp × Arena % − cut */
 const gridOn=r=>!!(S&&S.grid&&isArena(r)&&hasOldEv(r));
 const gridEligible=r=>isArena(r)&&!(S.gridDone&&S.gridDone.has(r.item_id))&&(!hasOldEv(r)||!!gridOf(r));
-/* cut for a value in a sport row → {cut, band}; under $10 → no cut */
-function gridCutFor(v,sp){ const bi=AC_GRID_BANDS.findIndex(([lo,hi])=>v>=lo&&v<hi); return bi<0?{cut:0,band:"under $10"}:{cut:AC_GRID[sp].cuts[bi],band:AC_GRID_BANDS[bi][2]}; }
+/* cut for a value in a sport row → {cut, band}; $10 and under → no cut */
+function gridCutFor(v,sp){ const bi=AC_GRID_BANDS.findIndex(([lo,hi])=>v>=lo&&v<hi); return bi<0?{cut:0,band:"$10 and under"}:{cut:AC_GRID[sp].cuts[bi],band:AC_GRID_BANDS[bi][2]}; }
 /* new Arena comps: EV = comp × Arena % × (1 − grid cut). Band comes from comp × Arena % (before the cut). Whole dollars. */
 function arenaCalc(b,f,sp,market){ const pre=b*f, g=market?{cut:0,band:"market"}:gridCutFor(pre,sp); return {pre, cut:g.cut, band:g.band, sport:AC_GRID[sp].name, to:wholeUp(pre*(1-g.cut))}; }
 const baseOf=r=>{const o=S.over.get(r.item_id); return o&&o.ev!==""&&o.ev!=null?num(o.ev):S.target};
@@ -1103,7 +1103,7 @@ function render(){
         <button class="btn ${S.grid?"go":""}" type="button" id="gridBtn" title="Cut to today's AC EV, by sport and EV (Oct 20 deck)">${S.grid?"✓ AC cut on":"Cut AC comps (~30%)"}</button>
         ${S.grid&&S.gridInfo?(S.gridInfo.loading?`<span class="spin"></span><span class="dim small">Checking…</span>`:`<div class="gridsum">
           <b>${S.gridInfo.cut.toLocaleString()}</b> cut from today's EV${S.gridInfo.fresh?` · <b>${S.gridInfo.fresh.toLocaleString()}</b> new — type the comp price`:""}
-          <div class="dim small">Skipped ${(S.gridInfo.under10+S.gridInfo.done+S.gridInfo.notArena).toLocaleString()}: under $10, already cut, or not Arena Club.</div></div>`):`<span class="dim small">Cuts Arena Club EVs ~30% by sport and value.</span>`}
+          <div class="dim small">Skipped ${(S.gridInfo.under10+S.gridInfo.done+S.gridInfo.notArena).toLocaleString()}: $10 and under, already cut, or not Arena Club.</div></div>`):`<span class="dim small">Cuts Arena Club EVs ~30% by sport and value.</span>`}
       </div>`:""}
       <div class="evform evurl">
         <label>URL (optional)<input id="urlIn" type="url" value="${esc(S.url)}" placeholder="https://www.ebay.com/itm/…" ${locked?"disabled":""}></label>
